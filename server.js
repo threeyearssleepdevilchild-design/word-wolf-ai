@@ -8,11 +8,13 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
-const apiKey = process.env.GEMINI_API_KEY;
+// ★修正点1: APIキーの「改行」や「空白」を自動で削除する
+const rawApiKey = process.env.GEMINI_API_KEY || "";
+const apiKey = rawApiKey.trim(); 
 
-// ★デバッグ: キー確認
+// デバッグ: キーの状態確認（改行がないかチェック）
 if(apiKey) {
-    console.log(`API Key is set: ${apiKey.substring(0,3)}...`);
+    console.log(`API Key is set (Length: ${apiKey.length}): ${apiKey.substring(0,3)}...`);
 } else {
     console.error("!!! API Key is MISSING !!!");
 }
@@ -23,7 +25,6 @@ let players = [];
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
 
-// ★変更点: ライブラリを使わず、直接 fetch でAPIを叩く関数
 async function generateWords(difficulty) {
     if (!apiKey) {
         console.log("APIキーがないため固定ワードを使用");
@@ -49,32 +50,32 @@ async function generateWords(difficulty) {
     try {
         console.log("AIへリクエスト送信(Direct Fetch)...");
         
-        // ★ここが最大の変更点：URLへ直接データを送る
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // ★修正点2: URLは gemini-1.5-flash で固定（これが一番速くて安いため）
+        // もし将来 gemini-2.0 などが出たらここを変えるだけでOKです
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+        const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }]
+                contents: [{ parts: [{ text: prompt }] }]
             })
         });
 
+        // ★修正点3: エラーなら、その詳細をログに出す
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Google API Error details: ${errorText}`);
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
         
-        // Geminiからの返答を取り出す
+        // 返答を取り出す
         let text = data.candidates[0].content.parts[0].text;
         console.log("AI生返答:", text);
 
-        // 掃除
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        
         return JSON.parse(text);
 
     } catch (error) {
