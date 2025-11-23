@@ -2,7 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+// 念のため古い書き方でも読み込めるように調整
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 
 const app = express();
 const server = http.createServer(app);
@@ -12,10 +13,26 @@ const port = process.env.PORT || 3000;
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
 
-// ★ここを修正：最も性能が良い最新モデルを指定し、余計な設定は削除
+// ★デバッグ: キーの確認（最初の3文字だけログに出す）
+if(apiKey) {
+    console.log(`API Key set: ${apiKey.substring(0,3)}...`);
+} else {
+    console.error("!!! API Key is MISSING !!!");
+}
+
 if (apiKey) {
     const genAI = new GoogleGenerativeAI(apiKey);
-    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // ★変更点1: モデルを 'gemini-pro' に変更（古いライブラリでも動く）
+    model = genAI.getGenerativeModel({ 
+        model: "gemini-pro",
+        // ★変更点2: 安全フィルターを無効化（ブロック防止）
+        safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
+    });
 }
 
 app.use(express.static('public'));
@@ -26,20 +43,19 @@ let votesReceived = 0;
 
 async function generateWords(difficulty) {
     if (!model) {
-        console.log("APIキー未設定");
+        console.log("モデル未初期化のため固定ワードを使用");
         return { village: "うどん", wolf: "そば", fox: "パスタ" };
     }
 
-    let difficultyPrompt = "一般向け";
-    if (difficulty === 'easy') difficultyPrompt = "小学生向け。簡単で具体的な単語";
-    if (difficulty === 'hard') difficultyPrompt = "大人向け。抽象的な単語";
+    let diffText = "一般向け";
+    if (difficulty === 'easy') diffText = "子供向け。簡単で具体的な単語";
+    if (difficulty === 'hard') diffText = "大人向け。抽象的な単語";
 
-    // プロンプトで強くJSONを要求する
     const prompt = `
         ワードウルフのお題を作成してください。
-        難易度: ${difficultyPrompt}
+        難易度: ${diffText}
         
-        以下のJSON形式だけで返答してください。余計な解説は不要です。
+        【重要】以下のJSON形式のみを出力すること。余計なマークダウンや解説は禁止。
         {
             "village": "...",
             "wolf": "...",
@@ -48,20 +64,23 @@ async function generateWords(difficulty) {
     `;
 
     try {
-        console.log("AIへリクエスト中...");
+        console.log("AIへリクエスト送信...");
         const result = await model.generateContent(prompt);
         const response = await result.response;
         let text = response.text();
         
-        console.log("AIの返答(生データ):", text);
+        console.log("AI生返答:", text); // 成功したらログに出る
 
-        // ★ここがポイント：JSON以外の余計な文字（```json や ```）をプログラムで削除する
+        // 掃除（```json などを消す）
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
         
         return JSON.parse(text);
 
     } catch (error) {
-        console.error("生成エラー:", error); 
+        // ★エラー理由を詳細にログに出す
+        console.error("============ AI生成エラー詳細 ============");
+        console.error(error);
+        console.error("========================================");
         return { village: "犬", wolf: "猫", fox: "たぬき" };
     }
 }
