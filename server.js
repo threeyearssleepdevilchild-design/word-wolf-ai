@@ -16,7 +16,7 @@ if (apiKey) {
     const genAI = new GoogleGenerativeAI(apiKey);
     // ★ここを変更：JSONモードを強制する設定を追加
     model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
+        model: "gemini-pro",
         generationConfig: { responseMimeType: "application/json" }
     });
 } else {
