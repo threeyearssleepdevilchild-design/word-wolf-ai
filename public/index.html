@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AIワードウルフ</title>
-    <!-- Google Fonts: 日本語を可愛く表示 -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Animate.css: 簡単にアニメーションをつける -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     
     <style>
@@ -15,8 +13,6 @@
             --card-color: #16213e;
             --accent-color: #e94560;
             --text-color: #ecf0f1;
-            --btn-primary: #0f3460;
-            --btn-hover: #533483;
         }
 
         body {
@@ -37,7 +33,6 @@
             text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
         }
 
-        /* 共通のカードデザイン */
         .box {
             background-color: var(--card-color);
             border-radius: 20px;
@@ -51,7 +46,6 @@
 
         .hidden { display: none; }
 
-        /* 入力フォーム */
         input, select {
             width: 100%;
             padding: 15px;
@@ -61,12 +55,9 @@
             background: #0f3460;
             color: white;
             font-size: 16px;
-            font-family: inherit;
-            box-sizing: border-box; /* はみ出し防止 */
+            box-sizing: border-box;
         }
-        input:focus, select:focus { outline: 2px solid var(--accent-color); }
-
-        /* ボタン */
+        
         button {
             width: 100%;
             padding: 15px;
@@ -78,33 +69,35 @@
             cursor: pointer;
             background-color: var(--accent-color);
             color: white;
-            font-family: inherit;
-            transition: transform 0.1s, filter 0.2s;
-            box-shadow: 0 4px 0 darken(var(--accent-color), 20%);
+            transition: transform 0.1s;
         }
         button:active { transform: translateY(2px); }
         button.secondary { background-color: #95a5a6; }
         button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
+        
+        /* 危険なボタン（リセット用） */
+        button.danger-link {
+            background: none;
+            color: #666;
+            font-size: 0.8rem;
+            margin-top: 30px;
+            padding: 5px;
+            text-decoration: underline;
+        }
 
-        /* お題表示エリア */
         #word-card {
             background: linear-gradient(135deg, #0f3460, #16213e);
             padding: 30px;
             border-radius: 15px;
             margin: 20px 0;
             border: 2px dashed var(--accent-color);
-            position: relative;
-            overflow: hidden;
         }
         #word-display {
             font-size: 2.5rem;
             font-weight: bold;
             color: #fff;
-            z-index: 2;
-            position: relative;
         }
 
-        /* リスト */
         ul { padding: 0; list-style: none; }
         li {
             background: rgba(255,255,255,0.05);
@@ -116,18 +109,11 @@
             align-items: center;
         }
 
-        /* 結果画面の役職色 */
         .role-wolf { color: #ff6b6b; }
         .role-fox { color: #feca57; }
         .role-villager { color: #1dd1a1; }
-
-        /* ローディングや待機中の点滅 */
         .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -136,8 +122,13 @@
     <!-- 1. 名前入力 -->
     <div id="login-screen" class="box animate__animated animate__fadeInUp">
         <p>ニックネームを入力して参加</p>
-        <input type="text" id="username" placeholder="例：ウルフくん" />
+        <input type="text" id="username" placeholder="名前（復帰時も同じ名前で！）" />
         <button onclick="joinGame()">部屋に入る 🚪</button>
+        
+        <!-- ここに救済用のリセットボタンを追加 -->
+        <div style="text-align: center;">
+            <button class="danger-link" onclick="forceReset()">⚠️ ゲームが動かなくなったらここを押してリセット</button>
+        </div>
     </div>
 
     <!-- 2. ロビー -->
@@ -146,18 +137,14 @@
             <h2>⛺ 待機所</h2>
             <span id="player-count" style="font-size:0.8rem; color:#aaa;">0人</span>
         </div>
-        
-        <p style="font-size: 0.9rem; color: #bbb;">友達にURLを送って招待しよう！</p>
-        <button class="copy-btn" onclick="copyUrl()">🔗 この部屋のURLをコピー</button>
-        
+        <button class="copy-btn" onclick="copyUrl()">🔗 URLをコピー</button>
         <ul id="players-ul"></ul>
-
         <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <label style="font-size: 0.9rem;">お題の難易度</label>
+            <label style="font-size: 0.9rem;">難易度</label>
             <select id="difficulty">
-                <option value="easy">🐣 かんたん（子供向け）</option>
-                <option value="normal" selected>🙂 ふつう（一般）</option>
-                <option value="hard">😈 むずかしい（大人向け）</option>
+                <option value="easy">🐣 かんたん</option>
+                <option value="normal" selected>🙂 ふつう</option>
+                <option value="hard">😈 むずかしい</option>
             </select>
             <button onclick="startGame()">ゲーム開始 🎮</button>
         </div>
@@ -166,27 +153,20 @@
     <!-- 3. ゲーム画面 -->
     <div id="game-screen" class="box hidden animate__animated animate__zoomIn">
         <h2>あなたのお題</h2>
-        <p class="pulse" style="font-size: 0.9rem; color: #aaa;">Discordで会話中...</p>
-        
-        <div id="word-card">
-            <div id="word-display">???</div>
-        </div>
-        
-        <p style="font-size: 0.8rem; color: #888;">自分が「少数派」か「キツネ」だと思ったら、<br>うまく嘘をついて紛れ込もう！</p>
-        <button class="secondary" onclick="socket.emit('start_voting')">✋ 議論終了・投票へ</button>
+        <p class="pulse" style="font-size: 0.9rem; color: #aaa;">会話中...</p>
+        <div id="word-card"><div id="word-display">???</div></div>
+        <button class="secondary" onclick="socket.emit('start_voting')">✋ 投票へ進む</button>
     </div>
 
     <!-- 4. 投票画面 -->
     <div id="vote-screen" class="box hidden animate__animated animate__fadeInRight">
         <h2>👉 追放投票</h2>
-        <p>怪しいと思う人を選んでください</p>
         <div id="vote-buttons"></div>
     </div>
     
     <!-- 5. 待機画面 -->
     <div id="wait-vote-screen" class="box hidden animate__animated animate__fadeIn">
         <h2>🙏 祈り中...</h2>
-        <p class="pulse">他のプレイヤーの投票を待っています</p>
         <div style="font-size: 3rem; margin: 20px;">⌛</div>
     </div>
 
@@ -197,27 +177,19 @@
         <div style="margin-top: 20px; height: 4px; background: #333; border-radius: 2px; overflow: hidden;">
             <div id="timer-bar" style="width: 100%; height: 100%; background: var(--accent-color);"></div>
         </div>
-        <p style="font-size: 0.8rem; text-align: right;">15秒後にロビーへ戻ります</p>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
-        // ランダムアイコン用
         const icons = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷'];
-        function getRandomIcon() {
-            return icons[Math.floor(Math.random() * icons.length)];
-        }
 
-        // 画面切り替えヘルパー
         function showScreen(screenId) {
             document.querySelectorAll('.box').forEach(el => el.classList.add('hidden'));
             const target = document.getElementById(screenId);
             target.classList.remove('hidden');
-            // アニメーション再発火のためクラスを付け外し
             target.classList.remove('animate__animated');
-            void target.offsetWidth; // リフローハック
+            void target.offsetWidth;
             target.classList.add('animate__animated');
         }
 
@@ -225,36 +197,50 @@
             const name = document.getElementById('username').value;
             if(!name) return alert("名前を入力してください");
             socket.emit('join_game', name);
-            showScreen('lobby-screen');
+            // ここでは画面遷移せず、サーバーからの応答を待つ（エラーかもしれないから）
         }
 
         function startGame() {
             const diff = document.getElementById('difficulty').value;
             socket.emit('start_game', diff);
         }
+        
+        // 強制リセット機能
+        function forceReset() {
+            if(confirm("本当にリセットしますか？\n進行中のゲームは中断され、全員がロビーに戻されます。")) {
+                socket.emit('force_reset');
+            }
+        }
 
         function copyUrl() {
-            const url = window.location.href;
-            navigator.clipboard.writeText(url).then(() => {
-                const btn = document.querySelector('.copy-btn');
-                const originalText = btn.textContent;
-                btn.textContent = "✅ コピーしました！";
-                setTimeout(() => btn.textContent = originalText, 2000);
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert("コピーしました！");
             });
         }
 
         // --- Socket Events ---
 
+        // 参加成功したらロビーへ（または復帰）
         socket.on('update_players', (players) => {
+            // まだログイン画面にいて、かつ自分の名前がリストにあればロビーへ
+            const myName = document.getElementById('username').value;
+            const amIJoined = players.some(p => p.name === myName);
+            
+            // ゲーム中でないならロビー表示
+            if (document.getElementById('game-screen').classList.contains('hidden') && 
+                document.getElementById('vote-screen').classList.contains('hidden') &&
+                document.getElementById('result-screen').classList.contains('hidden') &&
+                amIJoined) {
+                showScreen('lobby-screen');
+            }
+
             const ul = document.getElementById('players-ul');
             document.getElementById('player-count').textContent = players.length + "人参加中";
             ul.innerHTML = '';
             players.forEach((p, index) => {
                 const li = document.createElement('li');
-                // アイコンは名前から生成（ハッシュ的）あるいは簡易ランダム
-                // 今回はリストの順番でアイコンを割り当ててみる
                 const icon = icons[index % icons.length];
-                li.innerHTML = `<span>${icon} ${p.name}</span> ${p.id === socket.id ? '<span style="font-size:0.8em; opacity:0.7">(自分)</span>' : ''}`;
+                li.innerHTML = `<span>${icon} ${p.name}</span>`;
                 ul.appendChild(li);
             });
         });
@@ -268,13 +254,12 @@
             showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
             div.innerHTML = '';
-            
             players.forEach((p, index) => {
                 if(p.id === socket.id) return;
                 const btn = document.createElement('button');
                 btn.innerHTML = `${icons[index % icons.length]} <strong>${p.name}</strong> に投票`;
                 btn.onclick = () => {
-                    if(confirm(`${p.name} に投票していいですか？`)) {
+                    if(confirm(`${p.name} に投票しますか？`)) {
                         socket.emit('submit_vote', p.id);
                         showScreen('wait-vote-screen');
                     }
@@ -287,39 +272,26 @@
             showScreen('result-screen');
             const ul = document.getElementById('result-list');
             ul.innerHTML = '';
-            
-            // 票数順ソート
             players.sort((a, b) => b.voteCount - a.voteCount);
-
-            players.forEach((p, index) => {
-                let roleText = '';
-                let roleClass = '';
-                if(p.role === 'villager') { roleText = '村人'; roleClass = 'role-villager'; }
-                else if(p.role === 'wolf') { roleText = '人狼'; roleClass = 'role-wolf'; }
-                else { roleText = '狐'; roleClass = 'role-fox'; }
-
-                // 元のインデックスがわからないのでアイコンはずれる可能性がありますが、結果画面なので許容
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <div>
-                        <strong>${p.name}</strong> <span style="font-size:0.8em">(${p.voteCount}票)</span><br>
-                        <span style="color:#bbb; font-size:0.9em">お題: ${p.word}</span>
-                    </div>
-                    <div class="${roleClass}" style="font-weight:bold;">${roleText}</div>
-                `;
+            players.forEach(p => {
+                let roleT = p.role === 'villager' ? '村人' : (p.role === 'wolf' ? '人狼' : '狐');
+                let roleC = p.role === 'villager' ? 'role-villager' : (p.role === 'wolf' ? 'role-wolf' : 'role-fox');
+                let li = document.createElement('li');
+                li.innerHTML = `<div><strong>${p.name}</strong> (${p.voteCount}票)<br><span style="color:#bbb;font-size:0.8em">${p.word}</span></div><div class="${roleC}">${roleT}</div>`;
                 ul.appendChild(li);
             });
-
-            // タイマーバーのアニメーション
             const bar = document.getElementById('timer-bar');
             bar.style.transition = 'width 15s linear';
-            setTimeout(() => { bar.style.width = '0%'; }, 100); // 少し遅らせてアニメーション開始
+            setTimeout(() => { bar.style.width = '0%'; }, 100);
         });
 
         socket.on('reset_game', () => {
-            showScreen('lobby-screen');
-            document.getElementById('timer-bar').style.width = '100%'; // バーを戻す
+            showScreen('login-screen'); // 一旦ログイン画面に戻す（あるいはロビー）
+            // リセット後は名前入力して入り直すのが一番バグが少ないので、ログイン画面へ
+            document.getElementById('username').value = ''; 
+            document.getElementById('timer-bar').style.width = '100%';
             document.getElementById('timer-bar').style.transition = 'none';
+            alert("ゲームがリセットされました。名前を入力して入り直してください。");
         });
 
         socket.on('error_msg', (msg) => alert(msg));
