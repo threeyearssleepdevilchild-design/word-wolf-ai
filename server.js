@@ -8,11 +8,10 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
-// ★修正点1: APIキーの「改行」や「空白」を自動で削除する
+// APIキーの改行削除処理（これは成功しているのでそのまま！）
 const rawApiKey = process.env.GEMINI_API_KEY || "";
 const apiKey = rawApiKey.trim(); 
 
-// デバッグ: キーの状態確認（改行がないかチェック）
 if(apiKey) {
     console.log(`API Key is set (Length: ${apiKey.length}): ${apiKey.substring(0,3)}...`);
 } else {
@@ -48,11 +47,11 @@ async function generateWords(difficulty) {
     `;
 
     try {
-        console.log("AIへリクエスト送信(Direct Fetch)...");
+        console.log("AIへリクエスト送信(Gemini 2.0 Flash)...");
         
-        // ★修正点2: URLは gemini-1.5-flash で固定（これが一番速くて安いため）
-        // もし将来 gemini-2.0 などが出たらここを変えるだけでOKです
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        // ★修正点：モデル名を gemini-2.0-flash に変更しました！
+        // スクリーンショットにあった gemini-2.0-flash を指定します。
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
         const response = await fetch(url, {
             method: 'POST',
@@ -62,7 +61,6 @@ async function generateWords(difficulty) {
             })
         });
 
-        // ★修正点3: エラーなら、その詳細をログに出す
         if (!response.ok) {
             const errorText = await response.text();
             console.error(`Google API Error details: ${errorText}`);
@@ -71,7 +69,6 @@ async function generateWords(difficulty) {
 
         const data = await response.json();
         
-        // 返答を取り出す
         let text = data.candidates[0].content.parts[0].text;
         console.log("AI生返答:", text);
 
