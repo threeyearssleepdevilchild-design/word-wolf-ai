@@ -11,7 +11,10 @@
         :root { --bg-color: #1a1a2e; --card-color: #16213e; --accent-color: #e94560; --text-color: #ecf0f1; }
         body { font-family: 'M PLUS Rounded 1c', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
         .box { background-color: var(--card-color); border-radius: 20px; padding: 25px; width: 100%; max-width: 450px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
-        .hidden { display: none; }
+        
+        /* ★修正: !important をつけて、何があっても隠れるようにしました */
+        .hidden { display: none !important; }
+
         input, select { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: none; background: #0f3460; color: white; font-size: 16px; box-sizing: border-box; }
         button { width: 100%; padding: 15px; margin-top: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; background-color: var(--accent-color); color: white; }
         button.secondary { background-color: #95a5a6; }
@@ -27,23 +30,17 @@
         .spinner { width: 50px; height: 50px; border: 5px solid rgba(233, 69, 96, 0.3); border-top: 5px solid #e94560; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* ゲーム中のプレイヤーリスト用スタイル */
         .game-player-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
         .status-container { display: flex; gap: 10px; width: 100%; }
-        .status-btn { 
-            flex: 1; padding: 8px; margin: 0; font-size: 0.9rem; 
-            background: #333; color: #aaa; border: 1px solid #555; 
-            border-radius: 5px; transition: all 0.2s;
-        }
-        /* アクティブ時の色 */
+        .status-btn { flex: 1; padding: 8px; margin: 0; font-size: 0.9rem; background: #333; color: #aaa; border: 1px solid #555; border-radius: 5px; transition: all 0.2s; }
         .status-btn.active-question { background: #e94560; color: white; border-color: #e94560; box-shadow: 0 0 10px rgba(233, 69, 96, 0.4); }
         .status-btn.active-answer { background: #4CAF50; color: white; border-color: #4CAF50; box-shadow: 0 0 10px rgba(76, 175, 80, 0.4); }
-
     </style>
 </head>
 <body>
     <h1 class="animate__animated animate__fadeInDown">🦊 AIワードウルフ 🐺</h1>
 
+    <!-- 最初はhiddenがついているので消えるはず -->
     <div id="loading-overlay" class="hidden">
         <div class="spinner"></div>
         <p>AIがお題を考えています...<br>🧠💭</p>
@@ -80,7 +77,6 @@
         <div id="word-card"><div id="word-display">???</div></div>
         
         <p style="font-size:0.9em; color:#aaa; margin-bottom: 5px;">議論の進捗チェック</p>
-        <!-- ★ここにプレイヤーリストを表示 -->
         <ul id="game-players-ul" class="game-player-list"></ul>
 
         <button class="secondary" onclick="socket.emit('start_voting')">✋ 議論終了・投票へ</button>
@@ -139,8 +135,6 @@
         function nextGame() { socket.emit('trigger_next_game'); }
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
 
-        // --- イベント ---
-
         socket.on('update_players', (players) => {
             const myName = document.getElementById('username').value;
             if(myName && document.getElementById('login-screen').classList.contains('hidden') === false) {
@@ -156,20 +150,13 @@
             });
         });
 
-        // ★ゲーム中のプレイヤー状態更新（質問/回答ボタン）
         socket.on('update_game_status', (players) => {
             const ul = document.getElementById('game-players-ul');
             ul.innerHTML = '';
-            
             players.forEach((p, i) => {
                 const li = document.createElement('li');
-                // 自分かどうかで表示を少し変える（オプション）
-                const isMe = p.id === socket.id;
-                
-                // ボタンのクラス（押されていたら active-xxx をつける）
                 const qClass = p.status.question ? 'active-question' : '';
                 const aClass = p.status.answer ? 'active-answer' : '';
-
                 li.innerHTML = `
                     <div style="font-weight:bold;">${icons[i%icons.length]} ${p.name}</div>
                     <div class="status-container">
@@ -185,10 +172,7 @@
             });
         });
 
-        // ステータス切り替え送信
-        function toggleStatus(targetId, type) {
-            socket.emit('toggle_action', { targetId, type });
-        }
+        function toggleStatus(targetId, type) { socket.emit('toggle_action', { targetId, type }); }
 
         socket.on('loading_start', () => { document.getElementById('loading-overlay').classList.remove('hidden'); });
 
