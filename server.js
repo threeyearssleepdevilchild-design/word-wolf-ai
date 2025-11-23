@@ -20,15 +20,14 @@ let players = [];
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
 
-// ★追加1: 使ったワードを記憶しておくリスト（サーバー再起動でリセット）
+// 使ったワードを記憶しておくリスト
 let usedWordsHistory = [];
 
-// 安全なお題生成
 async function generateWords(difficulty) {
     const fallback = { village: "おにぎり", wolf: "サンドイッチ", fox: "ハンバーガー" };
     if (!apiKey) return fallback;
 
-    // ★追加2: サブジャンルをランダムに決める（マンネリ防止）
+    // サブジャンル設定（セクシー用）
     let subTheme = "";
     if (difficulty === 'sexy') {
         const sexySubThemes = [
@@ -54,9 +53,9 @@ async function generateWords(difficulty) {
         themeText = `セクシー、下ネタ、アダルト要素のある単語。\n今のサブテーマ: 【${subTheme}】`; 
     }
 
-    // ★追加3: 禁止ワードリストを作成（直近20個）
     const bannedWords = usedWordsHistory.slice(-20).join(", ");
 
+    // ★修正ポイント：ここに関係性の定義をガチガチに書き込みました
     const prompt = `
         ワードウルフのお題を作成してください。
         
@@ -64,9 +63,19 @@ async function generateWords(difficulty) {
         ターゲット: ${diffText}
         テーマ: ${themeText}
         
+        【ワードの3すくみ関係（絶対厳守）】
+        1. "village" (多数派) と "wolf" (少数派) :
+           - **非常に似ている単語**にしてください。
+           - 用途、形、ジャンルがほぼ同じで、議論しないと見分けがつかないレベル。（例：うどん vs そば）
+           
+        2. "fox" (第三勢力) :
+           - village/wolfとは**「全く違う」単語**にしてください。
+           - ただし、会話に参加できる程度の「大きな共通点」は持たせてください。
+           - **village/wolfとは決定的な違い（カテゴリー違い、素材違い、用途違いなど）がある単語**を選んでください。
+           - （例：village/wolfが「麺類」なら、foxは「パスタ（洋風）」や「焼きそば（汁なし）」など、明確に浮いているもの）
+
         【重要禁止事項】
-        以下の単語は最近使ったので、今回は絶対に使わないでください:
-        [ ${bannedWords} ]
+        以下の単語は最近使用したため禁止: [ ${bannedWords} ]
         
         【出力形式】
         JSON形式のみ出力(マークダウン禁止)。キー名は必ず小文字。
@@ -82,10 +91,7 @@ async function generateWords(difficulty) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                // ★追加4: 温度を上げてランダム性を高める
-                generationConfig: {
-                    temperature: 1.0 // 数値が高いほど独創的になる（通常は0.7くらい）
-                },
+                generationConfig: { temperature: 1.0 },
                 safetySettings: [
                     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
                     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -110,14 +116,11 @@ async function generateWords(difficulty) {
 
         if (!v || !w || !f) return fallback;
 
-        // ★追加5: 生成されたワードを履歴に保存
+        // 履歴保存
         usedWordsHistory.push(v);
         usedWordsHistory.push(w);
         usedWordsHistory.push(f);
-        // メモリ節約のため履歴が多すぎたら古いものを消す
-        if (usedWordsHistory.length > 50) {
-            usedWordsHistory = usedWordsHistory.slice(-50);
-        }
+        if (usedWordsHistory.length > 50) usedWordsHistory = usedWordsHistory.slice(-50);
 
         return { village: v, wolf: w, fox: f };
 
@@ -137,15 +140,7 @@ function calculateVoteResult() {
 io.on('connection', (socket) => {
     socket.on('join_game', (playerName) => {
         const existing = players.find(p => p.name === playerName);
-        
-        const newPlayer = { 
-            id: socket.id, 
-            name: playerName, 
-            role: '', 
-            word: '', 
-            voteCount: 0,
-            status: { question: false, answer: false }
-        };
+        const newPlayer = { id: socket.id, name: playerName, role: '', word: '', voteCount: 0, status: { question: false, answer: false } };
 
         if (gameState === 'WAITING') {
             if (existing) { existing.id = socket.id; }
@@ -171,11 +166,7 @@ io.on('connection', (socket) => {
 
         gameState = 'PLAYING';
         votesReceived = 0;
-        
-        players.forEach(p => { 
-            p.voteCount = 0;
-            p.status = { question: false, answer: false };
-        });
+        players.forEach(p => { p.voteCount = 0; p.status = { question: false, answer: false }; });
 
         const words = await generateWords(diff);
         const shuffled = [...players].sort(() => 0.5 - Math.random());
@@ -185,11 +176,9 @@ io.on('connection', (socket) => {
             else if (i === 1) { p.role = 'fox'; p.word = words.fox; }
             else { p.role = 'villager'; p.word = words.village; }
             if (!p.word) p.word = "エラー";
-            
             io.to(p.id).emit('game_started', { word: p.word });
         });
         players = shuffled;
-        
         io.emit('update_game_status', players);
     });
 
@@ -242,17 +231,13 @@ io.on('connection', (socket) => {
     socket.on('trigger_next_game', () => {
         gameState = 'WAITING';
         votesReceived = 0;
-        players.forEach(p => { 
-            p.role=''; p.word=''; p.voteCount=0;
-            p.status = { question: false, answer: false };
-        });
+        players.forEach(p => { p.role=''; p.word=''; p.voteCount=0; p.status = { question: false, answer: false }; });
         io.emit('reset_game'); 
         io.emit('update_players', players);
     });
 
     socket.on('force_reset', () => {
         players = []; gameState = 'WAITING'; votesReceived = 0;
-        // 履歴もリセットしたければここで usedWordsHistory = []; を入れる
         io.emit('reset_to_login'); 
     });
 
