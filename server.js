@@ -2,8 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-// 念のため古い書き方でも読み込めるように調整
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 
 const app = express();
 const server = http.createServer(app);
@@ -11,28 +9,12 @@ const io = new Server(server);
 const port = process.env.PORT || 3000;
 
 const apiKey = process.env.GEMINI_API_KEY;
-let model = null;
 
-// ★デバッグ: キーの確認（最初の3文字だけログに出す）
+// ★デバッグ: キー確認
 if(apiKey) {
-    console.log(`API Key set: ${apiKey.substring(0,3)}...`);
+    console.log(`API Key is set: ${apiKey.substring(0,3)}...`);
 } else {
     console.error("!!! API Key is MISSING !!!");
-}
-
-if (apiKey) {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    // ★変更点1: モデルを 'gemini-pro' に変更（古いライブラリでも動く）
-    model = genAI.getGenerativeModel({ 
-        model: "gemini-pro",
-        // ★変更点2: 安全フィルターを無効化（ブロック防止）
-        safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ]
-    });
 }
 
 app.use(express.static('public'));
@@ -41,9 +23,10 @@ let players = [];
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
 
+// ★変更点: ライブラリを使わず、直接 fetch でAPIを叩く関数
 async function generateWords(difficulty) {
-    if (!model) {
-        console.log("モデル未初期化のため固定ワードを使用");
+    if (!apiKey) {
+        console.log("APIキーがないため固定ワードを使用");
         return { village: "うどん", wolf: "そば", fox: "パスタ" };
     }
 
@@ -64,23 +47,39 @@ async function generateWords(difficulty) {
     `;
 
     try {
-        console.log("AIへリクエスト送信...");
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let text = response.text();
+        console.log("AIへリクエスト送信(Direct Fetch)...");
         
-        console.log("AI生返答:", text); // 成功したらログに出る
+        // ★ここが最大の変更点：URLへ直接データを送る
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: prompt }]
+                }]
+            })
+        });
 
-        // 掃除（```json などを消す）
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // Geminiからの返答を取り出す
+        let text = data.candidates[0].content.parts[0].text;
+        console.log("AI生返答:", text);
+
+        // 掃除
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
         
         return JSON.parse(text);
 
     } catch (error) {
-        // ★エラー理由を詳細にログに出す
         console.error("============ AI生成エラー詳細 ============");
         console.error(error);
-        console.error("========================================");
         return { village: "犬", wolf: "猫", fox: "たぬき" };
     }
 }
