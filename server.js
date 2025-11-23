@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
-// APIキーの改行削除処理（これは成功しているのでそのまま！）
+// APIキーの改行削除
 const rawApiKey = process.env.GEMINI_API_KEY || "";
 const apiKey = rawApiKey.trim(); 
 
@@ -26,19 +26,31 @@ let votesReceived = 0;
 
 async function generateWords(difficulty) {
     if (!apiKey) {
-        console.log("APIキーがないため固定ワードを使用");
         return { village: "うどん", wolf: "そば", fox: "パスタ" };
     }
 
+    // ★難易度・ジャンル設定
     let diffText = "一般向け";
-    if (difficulty === 'easy') diffText = "子供向け。簡単で具体的な単語";
-    if (difficulty === 'hard') diffText = "大人向け。抽象的な単語";
+    let themeText = "一般的な単語";
+    
+    if (difficulty === 'easy') {
+        diffText = "子供向け";
+        themeText = "簡単で具体的";
+    } else if (difficulty === 'hard') {
+        diffText = "大人向け";
+        themeText = "抽象的・価値観";
+    } else if (difficulty === 'sexy') {
+        // ★セクシーモードの設定
+        diffText = "成人向け(R-18)";
+        themeText = "アダルトグッズ、下ネタ、夜の生活に関する単語（例：バイブ、ローター、TENGAなど）。露骨な表現を許可します。";
+    }
 
     const prompt = `
         ワードウルフのお題を作成してください。
-        難易度: ${diffText}
+        ターゲット層: ${diffText}
+        テーマ: ${themeText}
         
-        【重要】以下のJSON形式のみを出力すること。余計なマークダウンや解説は禁止。
+        【重要】以下のJSON形式のみを出力すること。マークダウン禁止。
         {
             "village": "...",
             "wolf": "...",
@@ -47,17 +59,23 @@ async function generateWords(difficulty) {
     `;
 
     try {
-        console.log("AIへリクエスト送信(Gemini 2.0 Flash)...");
+        console.log(`AIへリクエスト送信(Gemini 2.5 Flash / Mode: ${difficulty})...`);
         
-        // ★修正点：モデル名を gemini-2.0-flash に変更しました！
-        // スクリーンショットにあった gemini-2.0-flash を指定します。
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        // ★Gemini 2.5 Flash に変更
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
+                contents: [{ parts: [{ text: prompt }] }],
+                // ★重要：セクシーワードを通すために安全フィルターを無効化する
+                safetySettings: [
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                ]
             })
         });
 
@@ -69,6 +87,12 @@ async function generateWords(difficulty) {
 
         const data = await response.json();
         
+        // 候補がない場合（ブロックされた場合など）の対策
+        if (!data.candidates || data.candidates.length === 0) {
+            console.error("AIが回答を拒否しました（安全フィルター等）");
+            return { village: "バナナ", wolf: "ナス", fox: "きゅうり" }; // 拒否された時のマイルドな下ネタ
+        }
+
         let text = data.candidates[0].content.parts[0].text;
         console.log("AI生返答:", text);
 
@@ -131,12 +155,18 @@ io.on('connection', (socket) => {
         if(votesReceived >= players.length) {
             gameState = 'RESULT';
             io.emit('game_result', players);
-            setTimeout(() => {
-                players.forEach(p => { p.role=''; p.word=''; p.voteCount=0; });
-                votesReceived = 0; gameState = 'WAITING';
-                io.emit('reset_game'); io.emit('update_players', players);
-            }, 15000);
+            // ★以前あった setTimeout (自動リセット) を削除しました
         }
+    });
+
+    // ★手動で「次のゲームへ」ボタンが押された時の処理
+    socket.on('trigger_next_game', () => {
+        players = []; 
+        gameState = 'WAITING'; 
+        votesReceived = 0;
+        // 全員の画面をロビーに戻す
+        io.emit('reset_game'); 
+        io.emit('update_players', players);
     });
 
     socket.on('force_reset', () => {

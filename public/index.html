@@ -73,9 +73,9 @@
         }
         button:active { transform: translateY(2px); }
         button.secondary { background-color: #95a5a6; }
-        button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
+        button.next-btn { background-color: #4CAF50; margin-top: 20px; font-size: 1.2rem; }
         
-        /* 危険なボタン（リセット用） */
+        button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
         button.danger-link {
             background: none;
             color: #666;
@@ -122,12 +122,10 @@
     <!-- 1. 名前入力 -->
     <div id="login-screen" class="box animate__animated animate__fadeInUp">
         <p>ニックネームを入力して参加</p>
-        <input type="text" id="username" placeholder="名前（復帰時も同じ名前で！）" />
+        <input type="text" id="username" placeholder="名前" />
         <button onclick="joinGame()">部屋に入る 🚪</button>
-        
-        <!-- ここに救済用のリセットボタンを追加 -->
         <div style="text-align: center;">
-            <button class="danger-link" onclick="forceReset()">⚠️ ゲームが動かなくなったらここを押してリセット</button>
+            <button class="danger-link" onclick="forceReset()">⚠️ ゲームが動かなくなったらリセット</button>
         </div>
     </div>
 
@@ -140,11 +138,12 @@
         <button class="copy-btn" onclick="copyUrl()">🔗 URLをコピー</button>
         <ul id="players-ul"></ul>
         <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <label style="font-size: 0.9rem;">難易度</label>
+            <label style="font-size: 0.9rem;">お題のジャンル</label>
             <select id="difficulty">
-                <option value="easy">🐣 かんたん</option>
-                <option value="normal" selected>🙂 ふつう</option>
-                <option value="hard">😈 むずかしい</option>
+                <option value="easy">🐣 かんたん（子供向け）</option>
+                <option value="normal" selected>🙂 ふつう（一般）</option>
+                <option value="hard">😈 むずかしい（抽象的）</option>
+                <option value="sexy">🔞 セクシー（大人限定）</option>
             </select>
             <button onclick="startGame()">ゲーム開始 🎮</button>
         </div>
@@ -174,9 +173,9 @@
     <div id="result-screen" class="box hidden animate__animated animate__backInUp">
         <h2>🏆 結果発表</h2>
         <ul id="result-list"></ul>
-        <div style="margin-top: 20px; height: 4px; background: #333; border-radius: 2px; overflow: hidden;">
-            <div id="timer-bar" style="width: 100%; height: 100%; background: var(--accent-color);"></div>
-        </div>
+        
+        <!-- ここに手動リセットボタンを追加 -->
+        <button class="next-btn" onclick="nextGame()">🔄 次のゲームへ</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -197,7 +196,6 @@
             const name = document.getElementById('username').value;
             if(!name) return alert("名前を入力してください");
             socket.emit('join_game', name);
-            // ここでは画面遷移せず、サーバーからの応答を待つ（エラーかもしれないから）
         }
 
         function startGame() {
@@ -205,28 +203,24 @@
             socket.emit('start_game', diff);
         }
         
-        // 強制リセット機能
         function forceReset() {
-            if(confirm("本当にリセットしますか？\n進行中のゲームは中断され、全員がロビーに戻されます。")) {
-                socket.emit('force_reset');
-            }
+            if(confirm("本当にリセットしますか？")) socket.emit('force_reset');
+        }
+
+        // 次のゲームへ（誰かが押せば全員戻る）
+        function nextGame() {
+            socket.emit('trigger_next_game');
         }
 
         function copyUrl() {
-            navigator.clipboard.writeText(window.location.href).then(() => {
-                alert("コピーしました！");
-            });
+            navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました！"));
         }
 
-        // --- Socket Events ---
-
-        // 参加成功したらロビーへ（または復帰）
         socket.on('update_players', (players) => {
-            // まだログイン画面にいて、かつ自分の名前がリストにあればロビーへ
             const myName = document.getElementById('username').value;
             const amIJoined = players.some(p => p.name === myName);
             
-            // ゲーム中でないならロビー表示
+            // ゲーム進行中でないならロビーへ
             if (document.getElementById('game-screen').classList.contains('hidden') && 
                 document.getElementById('vote-screen').classList.contains('hidden') &&
                 document.getElementById('result-screen').classList.contains('hidden') &&
@@ -280,18 +274,13 @@
                 li.innerHTML = `<div><strong>${p.name}</strong> (${p.voteCount}票)<br><span style="color:#bbb;font-size:0.8em">${p.word}</span></div><div class="${roleC}">${roleT}</div>`;
                 ul.appendChild(li);
             });
-            const bar = document.getElementById('timer-bar');
-            bar.style.transition = 'width 15s linear';
-            setTimeout(() => { bar.style.width = '0%'; }, 100);
         });
 
         socket.on('reset_game', () => {
-            showScreen('login-screen'); // 一旦ログイン画面に戻す（あるいはロビー）
-            // リセット後は名前入力して入り直すのが一番バグが少ないので、ログイン画面へ
-            document.getElementById('username').value = ''; 
-            document.getElementById('timer-bar').style.width = '100%';
-            document.getElementById('timer-bar').style.transition = 'none';
-            alert("ゲームがリセットされました。名前を入力して入り直してください。");
+            // リセットされたらログイン画面へ（名前入力しなおしでバグ防止）
+            showScreen('login-screen');
+            document.getElementById('username').value = '';
+            alert("ロビーに戻ります");
         });
 
         socket.on('error_msg', (msg) => alert(msg));
