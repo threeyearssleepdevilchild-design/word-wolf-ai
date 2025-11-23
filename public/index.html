@@ -22,11 +22,32 @@
         ul { padding: 0; list-style: none; }
         li { background: rgba(255,255,255,0.05); margin: 8px 0; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
         .role-wolf { color: #ff6b6b; } .role-fox { color: #feca57; } .role-villager { color: #1dd1a1; }
-        .highlight { border: 2px solid #feca57; background: rgba(254, 202, 87, 0.1); }
+        
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(233, 69, 96, 0.3); border-top: 5px solid #e94560; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* ゲーム中のプレイヤーリスト用スタイル */
+        .game-player-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+        .status-container { display: flex; gap: 10px; width: 100%; }
+        .status-btn { 
+            flex: 1; padding: 8px; margin: 0; font-size: 0.9rem; 
+            background: #333; color: #aaa; border: 1px solid #555; 
+            border-radius: 5px; transition: all 0.2s;
+        }
+        /* アクティブ時の色 */
+        .status-btn.active-question { background: #e94560; color: white; border-color: #e94560; box-shadow: 0 0 10px rgba(233, 69, 96, 0.4); }
+        .status-btn.active-answer { background: #4CAF50; color: white; border-color: #4CAF50; box-shadow: 0 0 10px rgba(76, 175, 80, 0.4); }
+
     </style>
 </head>
 <body>
     <h1 class="animate__animated animate__fadeInDown">🦊 AIワードウルフ 🐺</h1>
+
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p>AIがお題を考えています...<br>🧠💭</p>
+    </div>
 
     <!-- 1. 名前入力 -->
     <div id="login-screen" class="box animate__animated animate__fadeInUp">
@@ -57,7 +78,11 @@
     <div id="game-screen" class="box hidden animate__animated animate__zoomIn">
         <h2>あなたのお題</h2>
         <div id="word-card"><div id="word-display">???</div></div>
-        <p style="font-size:0.9em; color:#aaa;">まずは「キツネ」を探してください</p>
+        
+        <p style="font-size:0.9em; color:#aaa; margin-bottom: 5px;">議論の進捗チェック</p>
+        <!-- ★ここにプレイヤーリストを表示 -->
+        <ul id="game-players-ul" class="game-player-list"></ul>
+
         <button class="secondary" onclick="socket.emit('start_voting')">✋ 議論終了・投票へ</button>
     </div>
 
@@ -114,14 +139,13 @@
         function nextGame() { socket.emit('trigger_next_game'); }
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
 
+        // --- イベント ---
+
         socket.on('update_players', (players) => {
             const myName = document.getElementById('username').value;
-            // 名前があり、かつロビー画面待ちの状態ならロビー表示
             if(myName && document.getElementById('login-screen').classList.contains('hidden') === false) {
-                 // 初回参加時など
                  showScreen('lobby-screen');
             }
-            
             document.getElementById('player-count').textContent = players.length + "人";
             const ul = document.getElementById('players-ul');
             ul.innerHTML = '';
@@ -132,23 +156,60 @@
             });
         });
 
+        // ★ゲーム中のプレイヤー状態更新（質問/回答ボタン）
+        socket.on('update_game_status', (players) => {
+            const ul = document.getElementById('game-players-ul');
+            ul.innerHTML = '';
+            
+            players.forEach((p, i) => {
+                const li = document.createElement('li');
+                // 自分かどうかで表示を少し変える（オプション）
+                const isMe = p.id === socket.id;
+                
+                // ボタンのクラス（押されていたら active-xxx をつける）
+                const qClass = p.status.question ? 'active-question' : '';
+                const aClass = p.status.answer ? 'active-answer' : '';
+
+                li.innerHTML = `
+                    <div style="font-weight:bold;">${icons[i%icons.length]} ${p.name}</div>
+                    <div class="status-container">
+                        <button class="status-btn ${qClass}" onclick="toggleStatus('${p.id}', 'question')">
+                            🗣️ 質問${p.status.question ? '済' : ''}
+                        </button>
+                        <button class="status-btn ${aClass}" onclick="toggleStatus('${p.id}', 'answer')">
+                            💬 回答${p.status.answer ? '済' : ''}
+                        </button>
+                    </div>
+                `;
+                ul.appendChild(li);
+            });
+        });
+
+        // ステータス切り替え送信
+        function toggleStatus(targetId, type) {
+            socket.emit('toggle_action', { targetId, type });
+        }
+
+        socket.on('loading_start', () => { document.getElementById('loading-overlay').classList.remove('hidden'); });
+
         socket.on('game_started', (data) => {
+            document.getElementById('loading-overlay').classList.add('hidden');
             showScreen('game-screen');
             document.getElementById('word-display').textContent = data.word;
         });
 
         socket.on('show_voting_screen', (data) => {
+            document.getElementById('loading-overlay').classList.add('hidden');
             showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
             div.innerHTML = '';
             
-            // 画面の文言をフェーズごとに変える
             if (data.phase === 'FOX') {
                 document.getElementById('vote-title').textContent = "🦊 1回戦：キツネ投票";
-                document.getElementById('vote-desc').textContent = "まずは「キツネ（会話が噛み合わない人）」を探して追放してください。";
+                document.getElementById('vote-desc').textContent = "会話が噛み合わない「キツネ」を探してください";
             } else {
                 document.getElementById('vote-title').textContent = "🐺 2回戦：人狼投票";
-                document.getElementById('vote-desc').textContent = "キツネはいなくなりました。村に紛れた「人狼（嘘をついている人）」を追放してください！";
+                document.getElementById('vote-desc').textContent = "嘘をついている「人狼」を探してください！";
             }
 
             data.players.forEach((p, i) => {
@@ -166,7 +227,6 @@
             });
         });
 
-        // 狐がつられた時の演出
         socket.on('fox_caught', (data) => {
             showScreen('fox-caught-screen');
             document.getElementById('fox-victim-name').textContent = data.victimName;
@@ -179,7 +239,6 @@
             const msg = document.getElementById('result-message');
             
             ul.innerHTML = '';
-            
             if (data.winner === 'FOX') {
                 title.textContent = "🦊 キツネの独り勝ち！";
                 msg.textContent = `追放された ${data.victimName} はキツネではありませんでした。`;
@@ -204,17 +263,8 @@
             });
         });
 
-        // ロビーに戻る
-        socket.on('reset_game', () => {
-            showScreen('lobby-screen');
-        });
-
-        // 完全リセット（ログイン画面へ）
-        socket.on('reset_to_login', () => {
-            showScreen('login-screen');
-            document.getElementById('username').value = '';
-        });
-
+        socket.on('reset_game', () => { showScreen('lobby-screen'); });
+        socket.on('reset_to_login', () => { showScreen('login-screen'); document.getElementById('username').value = ''; });
         socket.on('error_msg', (msg) => alert(msg));
     </script>
 </body>
