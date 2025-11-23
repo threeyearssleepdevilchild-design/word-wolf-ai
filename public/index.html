@@ -17,8 +17,12 @@
         button.secondary { background-color: #95a5a6; }
         button.next-btn { background-color: #4CAF50; margin-top: 20px; font-size: 1.2rem; }
         button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
-        /* ガチャボタンの色 */
-        button.gacha-btn { background: linear-gradient(45deg, #FFD700, #FFA500); color: #333; margin-top: 20px; border: 2px solid #fff; }
+        
+        /* ガチャボタンエリア */
+        .gacha-container { display: flex; gap: 10px; margin-top: 20px; }
+        .gacha-btn { flex: 1; border: 2px solid #fff; color: #333; font-size: 0.9rem; padding: 10px; }
+        .gacha-q { background: linear-gradient(45deg, #ff9a9e, #fecfef); } /* 質問用ピンク系 */
+        .gacha-a { background: linear-gradient(45deg, #a18cd1, #fbc2eb); } /* 回答用パープル系 */
 
         #word-card { background: linear-gradient(135deg, #0f3460, #16213e); padding: 30px; border-radius: 15px; margin: 20px 0; border: 2px dashed var(--accent-color); }
         #word-display { font-size: 2.5rem; font-weight: bold; color: #fff; }
@@ -75,9 +79,12 @@
         <h2>あなたのお題</h2>
         <div id="word-card"><div id="word-display">???</div></div>
         
-        <!-- ★追加: 指名ガチャボタン -->
-        <button class="gacha-btn" onclick="socket.emit('trigger_random_pick')">🎲 誰かひとりを指名！</button>
-        <p style="font-size:0.8em; color:#aaa; margin-bottom:20px;">会話に詰まったら押してください</p>
+        <!-- ★追加: 指名ガチャボタン2種 -->
+        <div class="gacha-container">
+            <button class="gacha-btn gacha-q" onclick="socket.emit('trigger_random_pick', {type: 'question'})">🎲 質問者を指名</button>
+            <button class="gacha-btn gacha-a" onclick="socket.emit('trigger_random_pick', {type: 'answer'})">🎲 回答者を指名</button>
+        </div>
+        <p style="font-size:0.8em; color:#aaa; margin-bottom:20px;">未実施の人から優先して選ばれます</p>
 
         <p style="font-size:0.9em; color:#aaa; margin-bottom: 5px;">議論の進捗チェック</p>
         <ul id="game-players-ul" class="game-player-list"></ul>
@@ -176,10 +183,20 @@
             });
         });
 
-        // ★追加: 指名ガチャの結果表示
+        // ★追加: 指名結果の表示（出し分け）
         socket.on('random_pick_result', (data) => {
-            // アラートだと操作が止まるので、簡易的にアラートで通知、あるいは画面に表示
-            alert(`🎲 指名されたのは...\n\n👉 【 ${data.name} 】さん\n\n次の質問や回答をお願いします！`);
+            let title = "👉 指名されたのは...";
+            let roleText = "";
+            
+            if (data.type === 'question') {
+                title = "🎲 次の【質問者】を指名！";
+                roleText = "質問をお願いします！";
+            } else if (data.type === 'answer') {
+                title = "🎲 次の【回答者】を指名！";
+                roleText = "回答をお願いします！";
+            }
+            
+            alert(`${title}\n\n👉 【 ${data.name} 】さん\n\n${roleText}`);
         });
 
         function toggleStatus(targetId, type) { socket.emit('toggle_action', { targetId, type }); }

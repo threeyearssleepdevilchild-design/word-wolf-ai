@@ -8,6 +8,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
+// APIキーの空白削除
 const rawApiKey = process.env.GEMINI_API_KEY || "";
 const apiKey = rawApiKey.trim(); 
 
@@ -18,15 +19,12 @@ app.use(express.static('public'));
 let players = []; 
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
-
-// 使ったワード履歴
 let usedWordsHistory = [];
 
 async function generateWords(difficulty) {
     const fallback = { village: "おにぎり", wolf: "サンドイッチ", fox: "ハンバーガー" };
     if (!apiKey) return fallback;
 
-    // ★追加1: セクシー用サブジャンルを大幅増量
     let subTheme = "";
     if (difficulty === 'sexy') {
         const sexySubThemes = [
@@ -34,7 +32,7 @@ async function generateWords(difficulty) {
             "大人の道具・おもちゃ",
             "夜のテクニック・体位",
             "興奮するシチュエーション・場所",
-            "身体の部位・フェチ（匂い・音など）",
+            "身体の部位・フェチ（匂い・胸・尻など）",
             "コスプレ・ロールプレイ",
             "Sっ気・Mっ気・攻めと受け",
             "理想のプレイ・妄想",
@@ -45,58 +43,43 @@ async function generateWords(difficulty) {
 
     let diffText = "一般向け";
     let themeText = "一般的な単語";
-    
-    if (difficulty === 'easy') { 
-        diffText = "子供向け"; themeText = "簡単で具体的"; 
-    } else if (difficulty === 'hard') { 
-        diffText = "大人向け"; themeText = "抽象的・価値観"; 
-    } else if (difficulty === 'sexy') { 
-        diffText = "R-18 (成人向け)"; 
-        themeText = `セクシー、下ネタ、アダルト要素のある単語。\n今回のサブテーマ: 【${subTheme}】`; 
-    }
+    if (difficulty === 'easy') { diffText = "子供向け"; themeText = "簡単で具体的"; }
+    else if (difficulty === 'hard') { diffText = "大人向け"; themeText = "抽象的・価値観"; }
+    else if (difficulty === 'sexy') { diffText = "R-18 (成人向け)"; themeText = `セクシー、下ネタ、アダルト要素のある単語。\n今回のサブテーマ: 【${subTheme}】`; }
 
     const bannedWords = usedWordsHistory.slice(-20).join(", ");
 
     const prompt = `
         ワードウルフのお題を作成してください。
-        
-        【設定】
-        ターゲット: ${diffText}
-        テーマ: ${themeText}
+        【設定】ターゲット: ${diffText}, テーマ: ${themeText}
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **非常に似ている単語**（用途、形、ジャンルがほぼ同じ）。
-           - 議論しないと見分けがつかないレベル。
-           - **ほぼ同じ意味の単語**は選ばないこと。（例："village"騎乗位、"wolf"女騎乗位）
+           - **非常に似ている単語**にしてください。
+           - 用途、形、ジャンルがほぼ同じで、議論しないと見分けがつかないレベル。（例：うどん vs そば）
+           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位**と**女騎乗位**など）
 
         2. "fox" (第三勢力) :
-           - village/wolfとは**「全く違う」単語**。
-           - ただし、会話に参加できる程度の共通点は持たせること。
-           - カテゴリーや質感が決定的に違うものを選んでください。
+           - village/wolfとは**「全く違う」単語**にしてください。
+           - ただし、会話に参加できる程度の「大きな共通点」は持たせてください。
+           - **village/wolfとは決定的な違い（カテゴリー違い、素材違い、用途違いなど）がある単語**を選んでください。
+           - （例：village/wolfが「麺類」なら、foxは「パスタ（洋風）」や「焼きそば（汁なし）」など、明確に浮いているもの）
 
-        【重要禁止事項】
-        最近使用した単語は禁止: [ ${bannedWords} ]
-        
-        【出力形式】
-        JSON形式のみ出力(マークダウン禁止)。キー名は必ず小文字。
+        【重要禁止事項】最近使用した単語は禁止: [ ${bannedWords} ]
+        【出力形式】JSON形式のみ出力(マークダウン禁止)。
         { "village":"...", "wolf":"...", "fox":"..." }
     `;
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty} / Sub: ${subTheme})...`);
-        
-        // ★ご希望のGemini 2.5について:
-        // 現在 2.5 は未リリースのため、最新の 2.0 を使用します。
-        // 将来 2.5 が出たら、下の 2.0 を 2.5 に書き換えてください。
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 1.0 }, // 創造性を高める
+                generationConfig: { temperature: 1.0 },
                 safetySettings: [
                     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
                     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -107,7 +90,6 @@ async function generateWords(difficulty) {
         });
 
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-        
         const data = await response.json();
         if (!data.candidates || data.candidates.length === 0) return fallback;
 
@@ -145,9 +127,7 @@ io.on('connection', (socket) => {
     socket.on('join_game', (playerName) => {
         const existing = players.find(p => p.name === playerName);
         const newPlayer = { 
-            id: socket.id, 
-            name: playerName, 
-            role: '', word: '', voteCount: 0, 
+            id: socket.id, name: playerName, role: '', word: '', voteCount: 0, 
             status: { question: false, answer: false } 
         };
 
@@ -202,12 +182,29 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ★追加2: ランダム指名機能
-    socket.on('trigger_random_pick', () => {
-        if (players.length > 0) {
-            const randomPlayer = players[Math.floor(Math.random() * players.length)];
-            io.emit('random_pick_result', { name: randomPlayer.name });
+    // ★修正: 質問・回答それぞれで未実施の人から選ぶ機能
+    socket.on('trigger_random_pick', ({ type }) => {
+        if (players.length === 0) return;
+
+        let candidates = [];
+        
+        if (type === 'question') {
+            // 質問していない人を抽出
+            candidates = players.filter(p => !p.status.question);
+        } else if (type === 'answer') {
+            // 回答していない人を抽出
+            candidates = players.filter(p => !p.status.answer);
         }
+
+        // もし全員済んでいたら、全員を対象にする
+        if (candidates.length === 0) {
+            candidates = players;
+        }
+
+        const randomPlayer = candidates[Math.floor(Math.random() * candidates.length)];
+        
+        // 全員に結果を送信
+        io.emit('random_pick_result', { name: randomPlayer.name, type: type });
     });
 
     socket.on('start_voting', () => {
