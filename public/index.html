@@ -43,21 +43,15 @@
         
         #reason-box { background: rgba(255, 255, 255, 0.1); padding: 10px; margin: 15px 0; border-radius: 10px; font-size: 0.9rem; color: #ccc; border-left: 4px solid #3498db; text-align: left; }
 
-        /* SEボタンエリア */
-        .se-container { 
-            display: flex; gap: 10px; margin-bottom: 20px; 
-            background: rgba(0,0,0,0.3); padding: 10px; border-radius: 15px;
-        }
-        .se-btn {
-            padding: 10px; margin: 0; font-size: 0.9rem;
-            background: transparent; border: 2px solid #fff;
-        }
+        .se-container { display: flex; gap: 10px; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 15px; }
+        .se-btn { padding: 10px; margin: 0; font-size: 0.9rem; background: transparent; border: 2px solid #fff; }
         .se-nice { border-color: #ffd700; color: #ffd700; }
         .se-sus { border-color: #ff6b6b; color: #ff6b6b; }
 
+        /* 狐逆転画面オーバーレイ */
         #fox-challenge-overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(44, 11, 14, 0.95); z-index: 2000; 
+            background: rgba(44, 11, 14, 0.98); z-index: 2000; 
             display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
         }
         #fox-input { background: #5a1e23; border: 1px solid #ff6b6b; color: white; width: 80%; font-size: 1.2rem; }
@@ -124,7 +118,6 @@
             </div>
         </div>
         
-        <!-- ★SEボタン追加 -->
         <div class="se-container">
             <button class="se-btn se-nice" onclick="emitSound('nice')">👍 ナイス！</button>
             <button class="se-btn se-sus" onclick="emitSound('sus')">🤔 怪しい</button>
@@ -190,18 +183,15 @@
         const icons = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷'];
         let foxTimerInterval;
 
-        // ★修正: 効果音を鳴らす関数（ファイル指定）
         function playSound(filename) {
             const audio = new Audio('/sounds/' + filename);
             audio.play().catch(e => console.log("Sound play error:", e));
         }
 
-        // ボタンを押した時にサーバーへ送信
         function emitSound(type) {
             socket.emit('trigger_sound_effect', type);
         }
 
-        // サーバーから受信したら再生
         socket.on('play_sound_effect', (type) => {
             if(type === 'nice') playSound('nice.mp3');
             if(type === 'sus') playSound('sus.mp3');
@@ -213,6 +203,8 @@
             document.getElementById(id).classList.remove('animate__animated');
             void document.getElementById(id).offsetWidth;
             document.getElementById(id).classList.add('animate__animated');
+            
+            if(id === 'game-screen') document.getElementById('reaction-bar')?.classList.remove('hidden');
         }
 
         function changeBackground(difficulty) {
@@ -291,7 +283,7 @@
         });
 
         socket.on('game_started', (data) => {
-            playSound('start.mp3'); // 開始音
+            playSound('start.mp3');
             document.getElementById('loading-overlay').classList.add('hidden');
             showScreen('game-screen');
             document.getElementById('word-display').textContent = data.word;
@@ -300,16 +292,19 @@
         });
 
         socket.on('show_voting_screen', (data) => {
-            playSound('vote.mp3'); // 投票音
+            playSound('vote.mp3');
             document.getElementById('loading-overlay').classList.add('hidden');
             showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
             div.innerHTML = '';
             
-            document.getElementById('fox-challenge-overlay').classList.add('hidden');
+            // ★修正ポイント: 狐本人の場合は逆転画面を隠さない
+            if (data.deadFoxId !== socket.id) {
+                document.getElementById('fox-challenge-overlay').classList.add('hidden');
+            }
 
             if (data.deadFoxId === socket.id) {
-                div.innerHTML = "<p>あなたは追放されました...<br>逆転のチャンスを待機中...</p>";
+                div.innerHTML = "<p>あなたは追放されました...<br>現在、逆転チャレンジ回答中！</p>";
                 return; 
             }
             
@@ -370,13 +365,13 @@
         });
 
         socket.on('fox_caught', (data) => {
-            playSound('caught.mp3'); // 吊り音
+            playSound('caught.mp3');
             showScreen('fox-caught-screen');
             document.getElementById('fox-victim-name').textContent = data.victimName;
         });
 
         socket.on('game_result', (data) => {
-            playSound('result.mp3'); // 結果音
+            playSound('result.mp3');
             clearInterval(foxTimerInterval);
             document.getElementById('fox-challenge-overlay').classList.add('hidden'); 
             showScreen('result-screen');
