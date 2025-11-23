@@ -4,132 +4,228 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AIワードウルフ</title>
+    <!-- Google Fonts: 日本語を可愛く表示 -->
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Animate.css: 簡単にアニメーションをつける -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    
     <style>
-        /* 少しデザインをおしゃれにしました */
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; padding: 10px; background-color: #f0f2f5; color: #333; }
-        .hidden { display: none; }
-        .box { 
-            background: #fff; 
-            padding: 20px; 
-            margin: 10px auto; 
-            max-width: 500px; 
-            border-radius: 15px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        h1 { margin-bottom: 5px; font-size: 1.5em; color: #444; }
-        h2 { font-size: 1.2em; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        
-        button { 
-            width: 100%; 
-            padding: 15px; 
-            font-size: 16px; 
-            font-weight: bold;
-            cursor: pointer; 
-            background: #007bff; 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            margin-top: 10px; 
-            transition: background 0.2s;
-        }
-        button:active { transform: scale(0.98); }
-        button.secondary { background: #6c757d; }
-        button.vote-btn { background: #dc3545; margin-bottom: 10px;}
-        
-        input, select { 
-            width: 80%; 
-            padding: 12px; 
-            font-size: 16px; 
-            border: 1px solid #ccc; 
-            border-radius: 8px; 
-            margin-bottom: 15px;
+        :root {
+            --bg-color: #1a1a2e;
+            --card-color: #16213e;
+            --accent-color: #e94560;
+            --text-color: #ecf0f1;
+            --btn-primary: #0f3460;
+            --btn-hover: #533483;
         }
 
-        #word-display { 
-            font-size: 2.5em; 
-            color: #d32f2f; 
-            font-weight: bold; 
-            margin: 30px 0; 
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
             padding: 20px;
-            background: #fff0f0;
-            border-radius: 10px;
-            border: 2px dashed #ffcccc;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+
+        /* 共通のカードデザイン */
+        .box {
+            background-color: var(--card-color);
+            border-radius: 20px;
+            padding: 25px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .hidden { display: none; }
+
+        /* 入力フォーム */
+        input, select {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border: none;
+            background: #0f3460;
+            color: white;
+            font-size: 16px;
+            font-family: inherit;
+            box-sizing: border-box; /* はみ出し防止 */
+        }
+        input:focus, select:focus { outline: 2px solid var(--accent-color); }
+
+        /* ボタン */
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 10px;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: var(--accent-color);
+            color: white;
+            font-family: inherit;
+            transition: transform 0.1s, filter 0.2s;
+            box-shadow: 0 4px 0 darken(var(--accent-color), 20%);
+        }
+        button:active { transform: translateY(2px); }
+        button.secondary { background-color: #95a5a6; }
+        button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
+
+        /* お題表示エリア */
+        #word-card {
+            background: linear-gradient(135deg, #0f3460, #16213e);
+            padding: 30px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border: 2px dashed var(--accent-color);
+            position: relative;
+            overflow: hidden;
+        }
+        #word-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #fff;
+            z-index: 2;
+            position: relative;
+        }
+
+        /* リスト */
         ul { padding: 0; list-style: none; }
-        li { padding: 10px; border-bottom: 1px solid #eee; }
-        .role-villager { color: #28a745; font-weight: bold; }
-        .role-wolf { color: #dc3545; font-weight: bold; }
-        .role-fox { color: #ffc107; font-weight: bold; text-shadow: 1px 1px 0 #999; }
+        li {
+            background: rgba(255,255,255,0.05);
+            margin: 8px 0;
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 結果画面の役職色 */
+        .role-wolf { color: #ff6b6b; }
+        .role-fox { color: #feca57; }
+        .role-villager { color: #1dd1a1; }
+
+        /* ローディングや待機中の点滅 */
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
-    <h1>🦊 AIワードウルフ 🐺</h1>
+    <h1 class="animate__animated animate__fadeInDown">🦊 AIワードウルフ 🐺</h1>
 
     <!-- 1. 名前入力 -->
-    <div id="login-screen" class="box">
-        <p>ニックネームを入力してください</p>
-        <input type="text" id="username" placeholder="例：たなか" />
-        <button onclick="joinGame()">部屋に入る</button>
+    <div id="login-screen" class="box animate__animated animate__fadeInUp">
+        <p>ニックネームを入力して参加</p>
+        <input type="text" id="username" placeholder="例：ウルフくん" />
+        <button onclick="joinGame()">部屋に入る 🚪</button>
     </div>
 
     <!-- 2. ロビー -->
-    <div id="lobby-screen" class="box hidden">
-        <h2>待機所</h2>
-        <p>参加者リスト:</p>
-        <ul id="players-ul"></ul>
+    <div id="lobby-screen" class="box hidden animate__animated animate__fadeIn">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>⛺ 待機所</h2>
+            <span id="player-count" style="font-size:0.8rem; color:#aaa;">0人</span>
+        </div>
         
-        <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
-            <label for="difficulty">お題の難易度</label><br>
+        <p style="font-size: 0.9rem; color: #bbb;">友達にURLを送って招待しよう！</p>
+        <button class="copy-btn" onclick="copyUrl()">🔗 この部屋のURLをコピー</button>
+        
+        <ul id="players-ul"></ul>
+
+        <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <label style="font-size: 0.9rem;">お題の難易度</label>
             <select id="difficulty">
                 <option value="easy">🐣 かんたん（子供向け）</option>
                 <option value="normal" selected>🙂 ふつう（一般）</option>
-                <option value="hard">😈 むずかしい（抽象的）</option>
+                <option value="hard">😈 むずかしい（大人向け）</option>
             </select>
-            <button onclick="startGame()">ゲーム開始</button>
+            <button onclick="startGame()">ゲーム開始 🎮</button>
         </div>
     </div>
 
     <!-- 3. ゲーム画面 -->
-    <div id="game-screen" class="box hidden">
+    <div id="game-screen" class="box hidden animate__animated animate__zoomIn">
         <h2>あなたのお題</h2>
-        <p>周りの様子を探りながら会話しよう</p>
-        <div id="word-display">???</div>
-        <button class="secondary" onclick="socket.emit('start_voting')">議論を終了して投票へ</button>
+        <p class="pulse" style="font-size: 0.9rem; color: #aaa;">Discordで会話中...</p>
+        
+        <div id="word-card">
+            <div id="word-display">???</div>
+        </div>
+        
+        <p style="font-size: 0.8rem; color: #888;">自分が「少数派」か「キツネ」だと思ったら、<br>うまく嘘をついて紛れ込もう！</p>
+        <button class="secondary" onclick="socket.emit('start_voting')">✋ 議論終了・投票へ</button>
     </div>
 
     <!-- 4. 投票画面 -->
-    <div id="vote-screen" class="box hidden">
-        <h2>投票タイム</h2>
-        <p>人狼だと思う人を選んでください</p>
+    <div id="vote-screen" class="box hidden animate__animated animate__fadeInRight">
+        <h2>👉 追放投票</h2>
+        <p>怪しいと思う人を選んでください</p>
         <div id="vote-buttons"></div>
     </div>
     
-    <!-- 5. 投票完了待ち -->
-    <div id="wait-vote-screen" class="box hidden">
-        <h2>投票完了</h2>
-        <p>他の人の投票を待っています...</p>
-        <p>⌛</p>
+    <!-- 5. 待機画面 -->
+    <div id="wait-vote-screen" class="box hidden animate__animated animate__fadeIn">
+        <h2>🙏 祈り中...</h2>
+        <p class="pulse">他のプレイヤーの投票を待っています</p>
+        <div style="font-size: 3rem; margin: 20px;">⌛</div>
     </div>
 
     <!-- 6. 結果画面 -->
-    <div id="result-screen" class="box hidden">
-        <h2>結果発表！</h2>
+    <div id="result-screen" class="box hidden animate__animated animate__backInUp">
+        <h2>🏆 結果発表</h2>
         <ul id="result-list"></ul>
-        <p style="font-size: 0.8em; color: #666;">※15秒後に自動でロビーに戻ります</p>
+        <div style="margin-top: 20px; height: 4px; background: #333; border-radius: 2px; overflow: hidden;">
+            <div id="timer-bar" style="width: 100%; height: 100%; background: var(--accent-color);"></div>
+        </div>
+        <p style="font-size: 0.8rem; text-align: right;">15秒後にロビーへ戻ります</p>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let myId = '';
+        
+        // ランダムアイコン用
+        const icons = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷'];
+        function getRandomIcon() {
+            return icons[Math.floor(Math.random() * icons.length)];
+        }
+
+        // 画面切り替えヘルパー
+        function showScreen(screenId) {
+            document.querySelectorAll('.box').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(screenId);
+            target.classList.remove('hidden');
+            // アニメーション再発火のためクラスを付け外し
+            target.classList.remove('animate__animated');
+            void target.offsetWidth; // リフローハック
+            target.classList.add('animate__animated');
+        }
 
         function joinGame() {
             const name = document.getElementById('username').value;
             if(!name) return alert("名前を入力してください");
             socket.emit('join_game', name);
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('lobby-screen').classList.remove('hidden');
+            showScreen('lobby-screen');
         }
 
         function startGame() {
@@ -137,39 +233,50 @@
             socket.emit('start_game', diff);
         }
 
+        function copyUrl() {
+            const url = window.location.href;
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = "✅ コピーしました！";
+                setTimeout(() => btn.textContent = originalText, 2000);
+            });
+        }
+
+        // --- Socket Events ---
+
         socket.on('update_players', (players) => {
             const ul = document.getElementById('players-ul');
+            document.getElementById('player-count').textContent = players.length + "人参加中";
             ul.innerHTML = '';
-            players.forEach(p => {
+            players.forEach((p, index) => {
                 const li = document.createElement('li');
-                li.textContent = "👤 " + p.name;
+                // アイコンは名前から生成（ハッシュ的）あるいは簡易ランダム
+                // 今回はリストの順番でアイコンを割り当ててみる
+                const icon = icons[index % icons.length];
+                li.innerHTML = `<span>${icon} ${p.name}</span> ${p.id === socket.id ? '<span style="font-size:0.8em; opacity:0.7">(自分)</span>' : ''}`;
                 ul.appendChild(li);
             });
         });
 
         socket.on('game_started', (data) => {
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('result-screen').classList.add('hidden'); // リセット戻り用
-            document.getElementById('game-screen').classList.remove('hidden');
+            showScreen('game-screen');
             document.getElementById('word-display').textContent = data.word;
         });
 
         socket.on('show_voting_screen', (players) => {
-            document.getElementById('game-screen').classList.add('hidden');
-            document.getElementById('vote-screen').classList.remove('hidden');
+            showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
             div.innerHTML = '';
             
-            players.forEach(p => {
-                if(p.id === socket.id) return; // 自分には投票不可
+            players.forEach((p, index) => {
+                if(p.id === socket.id) return;
                 const btn = document.createElement('button');
-                btn.textContent = p.name + " に投票";
-                btn.className = "vote-btn";
+                btn.innerHTML = `${icons[index % icons.length]} <strong>${p.name}</strong> に投票`;
                 btn.onclick = () => {
-                    if(confirm(p.name + " に投票しますか？")) {
+                    if(confirm(`${p.name} に投票していいですか？`)) {
                         socket.emit('submit_vote', p.id);
-                        document.getElementById('vote-screen').classList.add('hidden');
-                        document.getElementById('wait-vote-screen').classList.remove('hidden');
+                        showScreen('wait-vote-screen');
                     }
                 };
                 div.appendChild(btn);
@@ -177,36 +284,42 @@
         });
 
         socket.on('game_result', (players) => {
-            document.getElementById('wait-vote-screen').classList.add('hidden');
-            document.getElementById('vote-screen').classList.add('hidden');
-            document.getElementById('result-screen').classList.remove('hidden');
-            
+            showScreen('result-screen');
             const ul = document.getElementById('result-list');
             ul.innerHTML = '';
             
-            // 得票数が多い順に並び替え（オプション）
+            // 票数順ソート
             players.sort((a, b) => b.voteCount - a.voteCount);
 
-            players.forEach(p => {
-                let roleLabel = '';
+            players.forEach((p, index) => {
+                let roleText = '';
                 let roleClass = '';
-                if(p.role === 'villager') { roleLabel = '村人'; roleClass = 'role-villager'; }
-                else if(p.role === 'wolf') { roleLabel = '人狼'; roleClass = 'role-wolf'; }
-                else { roleLabel = '狐'; roleClass = 'role-fox'; }
+                if(p.role === 'villager') { roleText = '村人'; roleClass = 'role-villager'; }
+                else if(p.role === 'wolf') { roleText = '人狼'; roleClass = 'role-wolf'; }
+                else { roleText = '狐'; roleClass = 'role-fox'; }
 
-                let li = document.createElement('li');
+                // 元のインデックスがわからないのでアイコンはずれる可能性がありますが、結果画面なので許容
+                const li = document.createElement('li');
                 li.innerHTML = `
-                    <strong>${p.name}</strong> : ${p.voteCount}票<br>
-                    お題「${p.word}」 <span class="${roleClass}">(${roleLabel})</span>
+                    <div>
+                        <strong>${p.name}</strong> <span style="font-size:0.8em">(${p.voteCount}票)</span><br>
+                        <span style="color:#bbb; font-size:0.9em">お題: ${p.word}</span>
+                    </div>
+                    <div class="${roleClass}" style="font-weight:bold;">${roleText}</div>
                 `;
                 ul.appendChild(li);
             });
+
+            // タイマーバーのアニメーション
+            const bar = document.getElementById('timer-bar');
+            bar.style.transition = 'width 15s linear';
+            setTimeout(() => { bar.style.width = '0%'; }, 100); // 少し遅らせてアニメーション開始
         });
 
         socket.on('reset_game', () => {
-            document.getElementById('result-screen').classList.add('hidden');
-            document.getElementById('wait-vote-screen').classList.add('hidden');
-            document.getElementById('lobby-screen').classList.remove('hidden');
+            showScreen('lobby-screen');
+            document.getElementById('timer-bar').style.width = '100%'; // バーを戻す
+            document.getElementById('timer-bar').style.transition = 'none';
         });
 
         socket.on('error_msg', (msg) => alert(msg));
