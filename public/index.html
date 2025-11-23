@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AIワードウルフ</title>
+    <style>
+        /* スマホでも見やすくする簡単なデザイン */
+        body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #fdfdfd; }
+        .hidden { display: none; }
+        .box { border: 2px solid #333; padding: 20px; margin: 10px auto; max-width: 400px; border-radius: 10px; background: #fff;}
+        button { padding: 15px 30px; font-size: 16px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 5px; margin: 5px;}
+        button.secondary { background: #f44336; }
+        input { padding: 10px; font-size: 16px; width: 70%; }
+        #word-display { font-size: 40px; color: #d32f2f; font-weight: bold; margin: 20px 0; }
+        li { list-style: none; margin: 5px 0; font-size: 18px; }
+        ul { padding: 0; }
+    </style>
+</head>
+<body>
+    <h1>🦊 AIワードウルフ 🐺</h1>
+
+    <!-- 名前入力 -->
+    <div id="login-screen" class="box">
+        <p>名前を入力して参加</p>
+        <input type="text" id="username" placeholder="ニックネーム" />
+        <br><br>
+        <button onclick="joinGame()">参加する</button>
+    </div>
+
+    <!-- 待機所 -->
+    <div id="lobby-screen" class="box hidden">
+        <h2>参加者リスト</h2>
+        <ul id="players-ul"></ul>
+        <p>全員揃ったら押してください↓</p>
+        <button onclick="socket.emit('start_game')">ゲーム開始</button>
+    </div>
+
+    <!-- ゲーム中 -->
+    <div id="game-screen" class="box hidden">
+        <h2>あなたのお題</h2>
+        <div id="word-display">???</div>
+        <p>Discordで話し合ってください</p>
+        <button class="secondary" onclick="socket.emit('start_voting')">議論終了・投票へ</button>
+    </div>
+
+    <!-- 投票 -->
+    <div id="vote-screen" class="box hidden">
+        <h2>追放する人を選ぶ</h2>
+        <div id="vote-buttons"></div>
+    </div>
+
+    <!-- 結果 -->
+    <div id="result-screen" class="box hidden">
+        <h2>結果発表</h2>
+        <ul id="result-list"></ul>
+        <button onclick="socket.emit('show_result')">結果を表示</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        function joinGame() {
+            const name = document.getElementById('username').value;
+            if(!name) return alert("名前を入れてね");
+            socket.emit('join_game', name);
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('lobby-screen').classList.remove('hidden');
+        }
+
+        // 画面切り替えの処理
+        socket.on('update_players', (players) => {
+            const ul = document.getElementById('players-ul');
+            ul.innerHTML = '';
+            players.forEach(p => {
+                const li = document.createElement('li');
+                li.textContent = "👤 " + p.name;
+                ul.appendChild(li);
+            });
+        });
+
+        socket.on('game_started', (data) => {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('word-display').textContent = data.word;
+        });
+
+        socket.on('show_voting_screen', (players) => {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('vote-screen').classList.remove('hidden');
+            const div = document.getElementById('vote-buttons');
+            div.innerHTML = '';
+            players.forEach(p => {
+                if(p.id === socket.id) return;
+                const btn = document.createElement('button');
+                btn.textContent = p.name + "に投票";
+                btn.className = "secondary";
+                btn.onclick = () => {
+                    socket.emit('submit_vote', p.id);
+                    alert("投票しました");
+                    div.innerHTML = "<p>投票完了！全員が終わるのを待って「結果を表示」を押してください</p>";
+                };
+                div.appendChild(btn);
+            });
+        });
+
+        socket.on('game_result', (players) => {
+            document.getElementById('vote-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+            const ul = document.getElementById('result-list');
+            ul.innerHTML = '';
+            players.forEach(p => {
+                let roleIcon = p.role === 'villager' ? '👱村人' : (p.role === 'wolf' ? '🐺人狼' : '🦊狐');
+                let li = document.createElement('li');
+                li.textContent = `${p.name} (${roleIcon}): お題「${p.word}」 - ${p.voteCount}票`;
+                ul.appendChild(li);
+            });
+        });
+        
+        socket.on('reset_game', () => {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('lobby-screen').classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>
