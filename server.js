@@ -17,7 +17,7 @@ app.use(express.static('public'));
 let players = []; 
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
-let usedWordsHistory = [];
+let usedWordsHistory = []; // 使用済みワード履歴
 let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
 let currentDifficulty = 'sexy';
@@ -55,12 +55,16 @@ async function generateWords(difficulty) {
     else if (difficulty === 'hard') { diffText = "大人向け"; themeText = "抽象的"; }
     else if (difficulty === 'sexy') { diffText = "R-18 (成人向け)"; themeText = `セクシー、下ネタ。サブテーマ:【${subTheme}】`; }
 
-    const bannedWords = usedWordsHistory.slice(-20).join(", ");
+    // ★変更点1: 過去50ゲーム分（150単語）すべてを禁止リストに入れる
+    const bannedWords = usedWordsHistory.join(", ");
 
     const prompt = `
         ワードウルフのお題を作成。
         ターゲット: ${diffText}, テーマ: ${themeText}
-        禁止ワード: [ ${bannedWords} ]
+        
+        【重要：禁止ワード】
+        以下の単語は過去に使用したため、今回は**絶対に使用しないでください**:
+        [ ${bannedWords} ]
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
@@ -80,7 +84,6 @@ async function generateWords(difficulty) {
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty})...`);
-        // ★Gemini 2.5 Flash に変更
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -105,8 +108,13 @@ async function generateWords(difficulty) {
 
         if (!v || !w || !f) return fallback;
 
+        // ★変更点2: 履歴保存数を150個（50ゲーム×3単語）に拡張
         usedWordsHistory.push(v, w, f);
-        if (usedWordsHistory.length > 50) usedWordsHistory = usedWordsHistory.slice(-50);
+        if (usedWordsHistory.length > 150) {
+            // 古いものから削除して150個に保つ
+            usedWordsHistory = usedWordsHistory.slice(-150);
+        }
+
         return { village: v, wolf: w, fox: f, reason: r };
 
     } catch (e) { console.error(e); return fallback; }
@@ -119,7 +127,6 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        // 質問生成も 2.5 を使用
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -155,15 +162,9 @@ io.on('connection', (socket) => {
                 existing.id = socket.id;
                 socket.emit('game_started', { word: existing.word, difficulty: currentDifficulty });
                 socket.emit('update_game_status', players); 
-                
-                if(gameState.startsWith('VOTING')) {
-                    socket.emit('show_voting_screen', { players, phase: gameState, deadFoxId });
-                }
+                if(gameState.startsWith('VOTING')) socket.emit('show_voting_screen', { players, phase: gameState, deadFoxId });
                 if(gameState === 'RESULT') socket.emit('game_result', { players, winner: 'unknown', reason: currentWords.reason });
-                
-                if(existing.id === deadFoxId && gameState === 'VOTING_WOLF') {
-                    socket.emit('start_fox_challenge');
-                }
+                if(existing.id === deadFoxId && gameState === 'VOTING_WOLF') socket.emit('start_fox_challenge');
                 io.emit('update_players', players);
             } else {
                 socket.emit('error_msg', 'ゲーム進行中です');
@@ -224,26 +225,15 @@ io.on('connection', (socket) => {
         socket.emit('ai_questions_result', questions);
     });
 
-    // ★修正：狐の回答チェック（2単語一致が必要）
     socket.on('submit_fox_guess', ({ vGuess, wGuess }) => {
         if (socket.id !== deadFoxId) return;
-        
-        // 村人ワードの判定（入力が含まれているか、逆か）
-        const hitV = currentWords.village.includes(vGuess) || vGuess.includes(currentWords.village);
-        // 人狼ワードの判定
-        const hitW = currentWords.wolf.includes(wGuess) || wGuess.includes(currentWords.wolf);
+        const isHitVillage = currentWords.village.includes(vGuess) || vGuess.includes(currentWords.village);
+        const isHitWolf = currentWords.wolf.includes(wGuess) || wGuess.includes(currentWords.wolf);
 
-        // 両方正解で勝利
-        if (hitV && hitW) {
+        if (isHitVillage && isHitWolf) {
             gameState = 'RESULT';
             const winnerName = players.find(p => p.id === deadFoxId).name;
-            io.emit('game_result', { 
-                players, 
-                winner: 'FOX_REVERSE', 
-                victimName: winnerName, 
-                guessWord: `${vGuess} & ${wGuess}`, // 表示用
-                reason: currentWords.reason 
-            });
+            io.emit('game_result', { players, winner: 'FOX_REVERSE', victimName: winnerName, guessWord: `${vGuess} & ${wGuess}`, reason: currentWords.reason });
         } else {
             socket.emit('fox_challenge_failed');
         }
@@ -294,9 +284,7 @@ io.on('connection', (socket) => {
                 if (victim.role === 'fox') {
                     deadFoxId = victim.id; 
                     io.emit('fox_caught', { victimName: victim.name });
-                    
                     io.to(deadFoxId).emit('start_fox_challenge');
-
                     setTimeout(() => {
                         gameState = 'VOTING_WOLF';
                         votesReceived = 0;
