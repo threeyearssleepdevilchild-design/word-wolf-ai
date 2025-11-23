@@ -9,15 +9,12 @@
     
     <style>
         :root { --bg-color: #1a1a2e; --card-color: #16213e; --accent-color: #e94560; --text-color: #ecf0f1; }
-        
         body.theme-sexy { background: linear-gradient(135deg, #2c0b0e, #1a0b2e) !important; }
         body.theme-hard { background: linear-gradient(135deg, #000000, #1a1a1a) !important; }
         body.theme-easy { background: linear-gradient(135deg, #89f7fe, #66a6ff) !important; color: #333; }
-        
         body { font-family: 'M PLUS Rounded 1c', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; transition: background 1s; }
         .box { background-color: var(--card-color); border-radius: 20px; padding: 25px; width: 100%; max-width: 450px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); position: relative;}
         .hidden { display: none !important; }
-
         input, select { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: none; background: #0f3460; color: white; font-size: 16px; box-sizing: border-box; }
         button { width: 100%; padding: 15px; margin-top: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; background-color: var(--accent-color); color: white; transition: transform 0.1s; }
         button:active { transform: scale(0.95); }
@@ -25,50 +22,45 @@
         button.next-btn { background-color: #4CAF50; margin-top: 20px; font-size: 1.2rem; }
         button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
         button.reroll-btn { background: #ff9800; font-size: 0.8rem; padding: 8px; margin-bottom: 10px; }
-
         .gacha-container { display: flex; gap: 10px; margin-top: 20px; }
         .gacha-btn { flex: 1; border: 2px solid #fff; color: #333; font-size: 0.9rem; padding: 10px; }
         .gacha-q { background: linear-gradient(45deg, #ff9a9e, #fecfef); }
         .gacha-a { background: linear-gradient(45deg, #a18cd1, #fbc2eb); }
-
         .card-container { perspective: 1000px; margin: 20px auto; width: 280px; height: 160px; }
         .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.8s; transform-style: preserve-3d; cursor: pointer; }
         .card-inner.flipped { transform: rotateY(180deg); }
         .card-front, .card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 15px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.3); border: 2px dashed var(--accent-color); }
         .card-front { background: #16213e; color: #bbb; font-size: 1.2rem; }
         .card-back { background: linear-gradient(135deg, #0f3460, #16213e); color: #fff; transform: rotateY(180deg); font-size: 2rem; font-weight: bold; }
-
         .ai-hint-btn { background: #3498db; margin-bottom: 15px; font-size: 0.9rem; }
         .ai-hint-list { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; text-align: left; font-size: 0.9rem; color: #add8e6; }
-        
         #reason-box { background: rgba(255, 255, 255, 0.1); padding: 10px; margin: 15px 0; border-radius: 10px; font-size: 0.9rem; color: #ccc; border-left: 4px solid #3498db; text-align: left; }
-
         .se-container { display: flex; gap: 10px; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 15px; }
         .se-btn { padding: 10px; margin: 0; font-size: 0.9rem; background: transparent; border: 2px solid #fff; }
         .se-nice { border-color: #ffd700; color: #ffd700; }
         .se-sus { border-color: #ff6b6b; color: #ff6b6b; }
-
-        /* 狐逆転画面オーバーレイ */
-        #fox-challenge-overlay { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(44, 11, 14, 0.98); z-index: 2000; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
-        }
-        #fox-input { background: #5a1e23; border: 1px solid #ff6b6b; color: white; width: 80%; font-size: 1.2rem; }
+        #fox-challenge-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44, 11, 14, 0.98); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        #fox-input-v, #fox-input-w { background: #5a1e23; border: 1px solid #ff6b6b; color: white; width: 80%; font-size: 1.1rem; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
         #timer-display { font-size: 3rem; color: #ff6b6b; font-weight: bold; margin: 20px; }
-
-        .role-wolf { color: #ff6b6b; } .role-fox { color: #feca57; } .role-villager { color: #1dd1a1; }
-        .voter-names { font-size: 0.75rem; color: #aaa; display: block; text-align: right; margin-top: 3px; }
-        
+        .role-wolf { color: #ff6b6b; font-weight: bold; } .role-fox { color: #feca57; font-weight: bold; } .role-villager { color: #1dd1a1; font-weight: bold; }
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
         .spinner { width: 50px; height: 50px; border: 5px solid rgba(233, 69, 96, 0.3); border-top: 5px solid #e94560; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
         .game-player-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
         .status-container { display: flex; gap: 10px; width: 100%; }
         .status-btn { flex: 1; padding: 8px; margin: 0; font-size: 0.9rem; background: #333; color: #aaa; border: 1px solid #555; border-radius: 5px; transition: all 0.2s; }
         .status-btn.active-question { background: #e94560; color: white; border-color: #e94560; box-shadow: 0 0 10px rgba(233, 69, 96, 0.4); }
         .status-btn.active-answer { background: #4CAF50; color: white; border-color: #4CAF50; box-shadow: 0 0 10px rgba(76, 175, 80, 0.4); }
+
+        /* ★リザルト画面の改善スタイル */
+        .result-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.08); margin: 10px 0; padding: 15px; border-radius: 12px; }
+        .result-main { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+        .player-name { font-size: 1.1rem; font-weight: bold; }
+        .word-badge { background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; color: #ddd; }
+        .result-votes { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .vote-count { font-size: 1.2rem; font-weight: bold; color: #e94560; }
+        .voters-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-top: 5px; }
+        .voter-tag { font-size: 0.7rem; background: #333; padding: 2px 6px; border-radius: 4px; color: #aaa; border: 1px solid #555; }
     </style>
 </head>
 <body>
@@ -147,9 +139,11 @@
     <!-- 狐逆転チャレンジ画面（オーバーレイ） -->
     <div id="fox-challenge-overlay" class="hidden animate__animated animate__fadeIn">
         <h2 style="color:#feca57; text-align:center;">🦊 大逆転チャレンジ！</h2>
-        <p style="color:white;">あなたは追放されました...<br>しかし、お題を当てれば逆転勝利！</p>
+        <p style="color:white;">村と狼、2つのワードを当てろ！<br>（順番は問いません）</p>
         <div id="timer-display">60</div>
-        <input type="text" id="fox-input" placeholder="村人のワードを予想">
+        <!-- ★修正: 入力欄を2つに -->
+        <input type="text" id="fox-input-v" placeholder="村のワードを予想">
+        <input type="text" id="fox-input-w" placeholder="狼のワードを予想">
         <button onclick="submitFoxGuess()" style="background:#d32f2f; width:80%; margin-top:20px; padding:15px; font-size:1.2rem;">🔥 ファイナルアンサー</button>
     </div>
     
@@ -188,14 +182,8 @@
             audio.play().catch(e => console.log("Sound play error:", e));
         }
 
-        function emitSound(type) {
-            socket.emit('trigger_sound_effect', type);
-        }
-
-        socket.on('play_sound_effect', (type) => {
-            if(type === 'nice') playSound('nice.mp3');
-            if(type === 'sus') playSound('sus.mp3');
-        });
+        function emitSound(type) { socket.emit('trigger_sound_effect', type); }
+        socket.on('play_sound_effect', (type) => { if(type==='nice')playSound('nice.mp3'); if(type==='sus')playSound('sus.mp3'); });
 
         function showScreen(id) {
             document.querySelectorAll('.box').forEach(el => el.classList.add('hidden'));
@@ -203,7 +191,6 @@
             document.getElementById(id).classList.remove('animate__animated');
             void document.getElementById(id).offsetWidth;
             document.getElementById(id).classList.add('animate__animated');
-            
             if(id === 'game-screen') document.getElementById('reaction-bar')?.classList.remove('hidden');
         }
 
@@ -298,13 +285,10 @@
             const div = document.getElementById('vote-buttons');
             div.innerHTML = '';
             
-            // ★修正ポイント: 狐本人の場合は逆転画面を隠さない
-            if (data.deadFoxId !== socket.id) {
-                document.getElementById('fox-challenge-overlay').classList.add('hidden');
-            }
+            if (data.deadFoxId !== socket.id) document.getElementById('fox-challenge-overlay').classList.add('hidden');
 
             if (data.deadFoxId === socket.id) {
-                div.innerHTML = "<p>あなたは追放されました...<br>現在、逆転チャレンジ回答中！</p>";
+                div.innerHTML = "<p>あなたは追放されました...<br>逆転のチャンスを待機中...</p>";
                 return; 
             }
             
@@ -340,11 +324,9 @@
         socket.on('start_fox_challenge', () => {
             const overlay = document.getElementById('fox-challenge-overlay');
             overlay.classList.remove('hidden');
-            
             let timeLeft = 60;
             const timerEl = document.getElementById('timer-display');
             timerEl.textContent = timeLeft;
-            
             clearInterval(foxTimerInterval);
             foxTimerInterval = setInterval(() => {
                 timeLeft--;
@@ -353,10 +335,12 @@
             }, 1000);
         });
 
+        // ★修正: 2単語入力の送信
         function submitFoxGuess() {
-            const guess = document.getElementById('fox-input').value;
-            if(!guess) return;
-            socket.emit('submit_fox_guess', guess);
+            const vGuess = document.getElementById('fox-input-v').value;
+            const wGuess = document.getElementById('fox-input-w').value;
+            if(!vGuess || !wGuess) return alert("両方のワードを入力してください");
+            socket.emit('submit_fox_guess', { vGuess, wGuess });
         }
         
         socket.on('fox_challenge_failed', () => {
@@ -370,6 +354,7 @@
             document.getElementById('fox-victim-name').textContent = data.victimName;
         });
 
+        // ★修正: リザルト画面のUI強化
         socket.on('game_result', (data) => {
             playSound('result.mp3');
             clearInterval(foxTimerInterval);
@@ -385,7 +370,7 @@
             
             if (data.winner === 'FOX_REVERSE') {
                 title.textContent = "🦊 キツネの大逆転勝利！";
-                msg.textContent = `キツネの ${data.victimName} がワード「${data.guessWord}」を見抜きました！`;
+                msg.textContent = `キツネの ${data.victimName} がワードを見抜きました！`;
                 title.style.color = "#feca57";
             } else if (data.winner === 'FOX') {
                 title.textContent = "🦊 キツネの独り勝ち！";
@@ -405,9 +390,25 @@
             data.players.forEach(p => {
                 let roleT = p.role === 'villager' ? '👱村人' : (p.role === 'wolf' ? '🐺人狼' : '🦊狐');
                 let roleC = p.role === 'villager' ? 'role-villager' : (p.role === 'wolf' ? 'role-wolf' : 'role-fox');
-                const voters = p.voters && p.voters.length > 0 ? `<br><span class="voter-names">← ${p.voters.join(', ')}</span>` : '';
+                
+                // 投票者タグの生成
+                const voterTags = p.voters && p.voters.length > 0 
+                    ? `<div class="voters-list">投票者: ${p.voters.map(v => `<span class="voter-tag">${v}</span>`).join('')}</div>` 
+                    : '';
+                
                 let li = document.createElement('li');
-                li.innerHTML = `<div><strong>${p.name}</strong> (${p.voteCount}票)${voters}<br><span style="color:#aaa;font-size:0.8em">お題:${p.word}</span></div><div class="${roleC}">${roleT}</div>`;
+                li.className = "result-item";
+                li.innerHTML = `
+                    <div class="result-main">
+                        <span class="player-name">${p.name}</span>
+                        <span class="${roleC}">${roleT}</span>
+                        <span class="word-badge">お題: ${p.word}</span>
+                    </div>
+                    <div class="result-votes">
+                        <span class="vote-count">${p.voteCount}票</span>
+                        ${voterTags}
+                    </div>
+                `;
                 ul.appendChild(li);
             });
         });

@@ -40,16 +40,11 @@ async function generateWords(difficulty) {
             "大人の道具・おもちゃ",
             "夜のテクニック・体位",
             "興奮するシチュエーション・場所",
-            "身体の部位・フェチ（匂い・胸・尻など）",
+            "身体の部位（胸・尻・乳首など）・フェチ（匂い・顔射など）",
             "コスプレ・ロールプレイ",
-            "Sっ気・Mっ気・攻めと受け",
-            "理想のプレイ・妄想",
+            "Sっ気・Mっ気・攻めと受け・痴女・淫乱",
             "ギリギリのライン（露出・スリル）",
-            "浮気・不倫・修羅場",
-            "初体験・過去の恋愛",
-            "オフィスラブ・社内恋愛",
-            "マッチングアプリ・ワンナイト",
-            "絶対に知られたくない性癖"
+            "浮気・不倫・修羅場・寝取られ",
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
     }
@@ -69,8 +64,8 @@ async function generateWords(difficulty) {
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **非常に似ている単語**。
-           - 用途、形、ジャンルがほぼ同じ。
+           - **非常に似ている単語**（用途、形、ジャンルがほぼ同じ）。
+           - 議論しないと見分けがつかないレベル。（例：うどん vs そば）
            - **ほぼ意味が同じ単語**は禁止（例：騎乗位と女騎乗位など）。
 
         2. "fox" (第三勢力) :
@@ -85,7 +80,8 @@ async function generateWords(difficulty) {
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty})...`);
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        // ★Gemini 2.5 Flash に変更
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -123,7 +119,8 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        // 質問生成も 2.5 を使用
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
@@ -174,9 +171,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ★追加：音出しリクエストの受信と配信
     socket.on('trigger_sound_effect', (soundType) => {
-        // soundType は 'nice' か 'sus'
         io.emit('play_sound_effect', soundType);
     });
 
@@ -229,15 +224,26 @@ io.on('connection', (socket) => {
         socket.emit('ai_questions_result', questions);
     });
 
-    socket.on('submit_fox_guess', (guess) => {
+    // ★修正：狐の回答チェック（2単語一致が必要）
+    socket.on('submit_fox_guess', ({ vGuess, wGuess }) => {
         if (socket.id !== deadFoxId) return;
-        const isHitVillage = currentWords.village.includes(guess) || guess.includes(currentWords.village);
-        const isHitWolf = currentWords.wolf.includes(guess) || guess.includes(currentWords.wolf);
+        
+        // 村人ワードの判定（入力が含まれているか、逆か）
+        const hitV = currentWords.village.includes(vGuess) || vGuess.includes(currentWords.village);
+        // 人狼ワードの判定
+        const hitW = currentWords.wolf.includes(wGuess) || wGuess.includes(currentWords.wolf);
 
-        if (isHitVillage || isHitWolf) {
+        // 両方正解で勝利
+        if (hitV && hitW) {
             gameState = 'RESULT';
             const winnerName = players.find(p => p.id === deadFoxId).name;
-            io.emit('game_result', { players, winner: 'FOX_REVERSE', victimName: winnerName, guessWord: guess, reason: currentWords.reason });
+            io.emit('game_result', { 
+                players, 
+                winner: 'FOX_REVERSE', 
+                victimName: winnerName, 
+                guessWord: `${vGuess} & ${wGuess}`, // 表示用
+                reason: currentWords.reason 
+            });
         } else {
             socket.emit('fox_challenge_failed');
         }
@@ -288,7 +294,9 @@ io.on('connection', (socket) => {
                 if (victim.role === 'fox') {
                     deadFoxId = victim.id; 
                     io.emit('fox_caught', { victimName: victim.name });
+                    
                     io.to(deadFoxId).emit('start_fox_challenge');
+
                     setTimeout(() => {
                         gameState = 'VOTING_WOLF';
                         votesReceived = 0;
