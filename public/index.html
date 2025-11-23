@@ -8,51 +8,65 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     
     <style>
+        /* 基本テーマ */
         :root { --bg-color: #1a1a2e; --card-color: #16213e; --accent-color: #e94560; --text-color: #ecf0f1; }
-        body { font-family: 'M PLUS Rounded 1c', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
-        .box { background-color: var(--card-color); border-radius: 20px; padding: 25px; width: 100%; max-width: 450px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* 背景切り替え用クラス */
+        body.theme-sexy { background: linear-gradient(135deg, #2c0b0e, #1a0b2e); }
+        body.theme-hard { background: linear-gradient(135deg, #000000, #1a1a1a); }
+        body.theme-easy { background: linear-gradient(135deg, #89f7fe, #66a6ff); color: #333; }
+        
+        body { font-family: 'M PLUS Rounded 1c', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; transition: background 1s; }
+        .box { background-color: var(--card-color); border-radius: 20px; padding: 25px; width: 100%; max-width: 450px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); position: relative;}
         .hidden { display: none !important; }
+
         input, select { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: none; background: #0f3460; color: white; font-size: 16px; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; margin-top: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; background-color: var(--accent-color); color: white; }
+        button { width: 100%; padding: 15px; margin-top: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; background-color: var(--accent-color); color: white; transition: transform 0.1s; }
+        button:active { transform: scale(0.95); }
         button.secondary { background-color: #95a5a6; }
         button.next-btn { background-color: #4CAF50; margin-top: 20px; font-size: 1.2rem; }
         button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
-        
+        button.reroll-btn { background: #ff9800; font-size: 0.8rem; padding: 8px; margin-bottom: 10px; }
+
         .gacha-container { display: flex; gap: 10px; margin-top: 20px; }
         .gacha-btn { flex: 1; border: 2px solid #fff; color: #333; font-size: 0.9rem; padding: 10px; }
         .gacha-q { background: linear-gradient(45deg, #ff9a9e, #fecfef); }
         .gacha-a { background: linear-gradient(45deg, #a18cd1, #fbc2eb); }
 
+        /* カードフリップアニメーション */
+        .card-container { perspective: 1000px; margin: 20px auto; width: 280px; height: 160px; }
+        .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.8s; transform-style: preserve-3d; cursor: pointer; }
+        .card-inner.flipped { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 15px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.3); border: 2px dashed var(--accent-color); }
+        .card-front { background: #16213e; color: #bbb; font-size: 1.2rem; }
+        .card-back { background: linear-gradient(135deg, #0f3460, #16213e); color: #fff; transform: rotateY(180deg); font-size: 2rem; font-weight: bold; }
+
         .ai-hint-btn { background: #3498db; margin-bottom: 15px; font-size: 0.9rem; }
         .ai-hint-list { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; text-align: left; font-size: 0.9rem; color: #add8e6; }
         
-        /* 解説表示用 */
-        #reason-box {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
-            margin: 15px 0;
-            border-radius: 10px;
-            font-size: 0.9rem;
-            color: #ccc;
-            border-left: 4px solid #3498db;
-            text-align: left;
+        #reason-box { background: rgba(255, 255, 255, 0.1); padding: 10px; margin: 15px 0; border-radius: 10px; font-size: 0.9rem; color: #ccc; border-left: 4px solid #3498db; text-align: left; }
+
+        /* 狐逆転画面オーバーレイ */
+        #fox-challenge-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(44, 11, 14, 0.95); z-index: 2000; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
         }
+        #fox-input { background: #5a1e23; border: 1px solid #ff6b6b; color: white; width: 80%; font-size: 1.2rem; }
+        #timer-display { font-size: 3rem; color: #ff6b6b; font-weight: bold; margin: 20px; }
 
-        #fox-challenge-area { background: #2c0b0e; border: 2px solid #ff6b6b; padding: 15px; border-radius: 10px; margin-top: 20px; }
-        #fox-input { background: #5a1e23; border: 1px solid #ff6b6b; color: white; }
-        #timer-display { font-size: 2rem; color: #ff6b6b; font-weight: bold; }
-
-        #word-card { background: linear-gradient(135deg, #0f3460, #16213e); padding: 30px; border-radius: 15px; margin: 20px 0; border: 2px dashed var(--accent-color); }
-        #word-display { font-size: 2.5rem; font-weight: bold; color: #fff; }
-        ul { padding: 0; list-style: none; }
-        li { background: rgba(255,255,255,0.05); margin: 8px 0; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        
         .role-wolf { color: #ff6b6b; } .role-fox { color: #feca57; } .role-villager { color: #1dd1a1; }
         .voter-names { font-size: 0.75rem; color: #aaa; display: block; text-align: right; margin-top: 3px; }
         
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
         .spinner { width: 50px; height: 50px; border: 5px solid rgba(233, 69, 96, 0.3); border-top: 5px solid #e94560; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* リアクションボタン */
+        #reaction-bar { position: fixed; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 100; }
+        .reaction-btn { width: 40px; height: 40px; padding: 0; margin: 0; border-radius: 50%; font-size: 1.2rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); }
+        .flying-emoji { position: fixed; font-size: 2rem; pointer-events: none; animation: flyUp 2s ease-out forwards; z-index: 999; }
+        @keyframes flyUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-300px) scale(1.5); opacity: 0; } }
 
         .game-player-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
         .status-container { display: flex; gap: 10px; width: 100%; }
@@ -67,6 +81,14 @@
     <div id="loading-overlay" class="hidden">
         <div class="spinner"></div>
         <p>AIが思考中...<br>🧠💭</p>
+    </div>
+
+    <!-- リアクションバー -->
+    <div id="reaction-bar" class="hidden">
+        <button class="reaction-btn" onclick="sendReaction('👏')">👏</button>
+        <button class="reaction-btn" onclick="sendReaction('😂')">😂</button>
+        <button class="reaction-btn" onclick="sendReaction('🤔')">🤔</button>
+        <button class="reaction-btn" onclick="sendReaction('😍')">😍</button>
     </div>
 
     <!-- 1. 名前入力 -->
@@ -85,11 +107,10 @@
         <div style="margin-top:20px; border-top:1px solid #444; padding-top:15px;">
             <label>お題のジャンル</label>
             <select id="difficulty">
+                <option value="sexy" selected>🔞 セクシー</option>
                 <option value="easy">🐣 かんたん</option>
                 <option value="normal">🙂 ふつう</option>
                 <option value="hard">😈 むずかしい</option>
-                <!-- ★セクシーをデフォルト選択に -->
-                <option value="sexy" selected>🔞 セクシー</option>
             </select>
             <button onclick="startGame()">ゲーム開始 🎮</button>
         </div>
@@ -97,8 +118,18 @@
 
     <!-- 3. ゲーム画面 -->
     <div id="game-screen" class="box hidden animate__animated animate__zoomIn">
-        <h2>あなたのお題</h2>
-        <div id="word-card"><div id="word-display">???</div></div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>あなたのお題</h2>
+            <button class="reroll-btn" onclick="reroll()">🔄 お題リロール</button>
+        </div>
+        
+        <!-- カードアニメーション -->
+        <div class="card-container" onclick="flipCard()">
+            <div class="card-inner" id="word-card-inner">
+                <div class="card-front">タップして確認</div>
+                <div class="card-back" id="word-display">???</div>
+            </div>
+        </div>
         
         <button class="ai-hint-btn" onclick="requestAiHint()">💡 質問案をAIに聞く</button>
         <div id="ai-hint-box" class="hidden ai-hint-list"></div>
@@ -119,14 +150,15 @@
         <h2 id="vote-title">👉 追放投票</h2>
         <p id="vote-desc">怪しい人を選んでください</p>
         <div id="vote-buttons"></div>
-        
-        <div id="fox-challenge-area" class="hidden">
-            <h3 style="color:#feca57; margin:0;">🦊 大逆転チャレンジ</h3>
-            <p>村人たちのワードを予想して入力せよ！<br>当たれば即勝利！</p>
-            <div id="timer-display">60</div>
-            <input type="text" id="fox-input" placeholder="予想ワード（例：うどん）">
-            <button onclick="submitFoxGuess()" style="background:#d32f2f;">🔥 決定！</button>
-        </div>
+    </div>
+    
+    <!-- 狐逆転チャレンジ画面（オーバーレイ） -->
+    <div id="fox-challenge-overlay" class="hidden animate__animated animate__fadeIn">
+        <h2 style="color:#feca57; text-align:center;">🦊 大逆転チャレンジ！</h2>
+        <p style="color:white;">あなたは追放されました...<br>しかし、お題を当てれば逆転勝利！</p>
+        <div id="timer-display">60</div>
+        <input type="text" id="fox-input" placeholder="村人のワードを予想">
+        <button onclick="submitFoxGuess()" style="background:#d32f2f; width:80%; margin-top:20px; padding:15px; font-size:1.2rem;">🔥 ファイナルアンサー</button>
     </div>
     
     <!-- 5. 待機画面 -->
@@ -147,10 +179,7 @@
     <!-- 7. 結果画面 -->
     <div id="result-screen" class="box hidden animate__animated animate__backInUp">
         <h2 id="winner-title">🏆 結果発表</h2>
-        
-        <!-- 解説エリア -->
         <div id="reason-box"></div>
-
         <p id="result-message"></p>
         <ul id="result-list"></ul>
         <button class="next-btn" onclick="nextGame()">🔄 同じメンバーで次へ</button>
@@ -162,13 +191,42 @@
         const icons = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷'];
         let foxTimerInterval;
 
+        // 音声作成（ファイル不要のビープ音）
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+        function playStartSE() { playTone(600, 'triangle', 0.1); setTimeout(()=>playTone(800, 'triangle', 0.4), 100); }
+        function playVoteSE() { playTone(400, 'sine', 0.2); }
+        function playResultSE() { playTone(500, 'square', 0.1); setTimeout(()=>playTone(500, 'square', 0.1), 150); setTimeout(()=>playTone(800, 'square', 0.6), 300); }
+
         function showScreen(id) {
             document.querySelectorAll('.box').forEach(el => el.classList.add('hidden'));
-            const t = document.getElementById(id);
-            t.classList.remove('hidden');
-            t.classList.remove('animate__animated');
-            void t.offsetWidth;
-            t.classList.add('animate__animated');
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.remove('animate__animated');
+            void document.getElementById(id).offsetWidth;
+            document.getElementById(id).classList.add('animate__animated');
+            
+            // リアクションバーはゲーム中のみ表示
+            if(id === 'game-screen') document.getElementById('reaction-bar').classList.remove('hidden');
+            else document.getElementById('reaction-bar').classList.add('hidden');
+        }
+
+        function changeBackground(difficulty) {
+            document.body.className = ''; // reset
+            if(difficulty === 'sexy') document.body.classList.add('theme-sexy');
+            else if(difficulty === 'hard') document.body.classList.add('theme-hard');
+            else if(difficulty === 'easy') document.body.classList.add('theme-easy');
         }
 
         function joinGame() {
@@ -179,7 +237,23 @@
 
         function startGame() { socket.emit('start_game', document.getElementById('difficulty').value); }
         function nextGame() { socket.emit('trigger_next_game'); }
+        function reroll() { if(confirm('本当にお題を変えますか？')) socket.emit('reroll_words'); }
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
+        
+        // カードめくり
+        function flipCard() { document.getElementById('word-card-inner').classList.toggle('flipped'); }
+
+        // リアクション
+        function sendReaction(emoji) { socket.emit('send_reaction', emoji); }
+        socket.on('receive_reaction', (emoji) => {
+            const el = document.createElement('div');
+            el.className = 'flying-emoji';
+            el.textContent = emoji;
+            el.style.left = Math.random() * 80 + 10 + '%';
+            el.style.bottom = '10%';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 2000);
+        });
 
         socket.on('update_players', (players) => {
             const myName = document.getElementById('username').value;
@@ -207,12 +281,8 @@
                 li.innerHTML = `
                     <div style="font-weight:bold;">${icons[i%icons.length]} ${p.name}</div>
                     <div class="status-container">
-                        <button class="status-btn ${qClass}" onclick="toggleStatus('${p.id}', 'question')">
-                            🗣️ 質問${p.status.question ? '済' : ''}
-                        </button>
-                        <button class="status-btn ${aClass}" onclick="toggleStatus('${p.id}', 'answer')">
-                            💬 回答${p.status.answer ? '済' : ''}
-                        </button>
+                        <button class="status-btn ${qClass}" onclick="toggleStatus('${p.id}', 'question')">🗣️ 質問${p.status.question?'済':''}</button>
+                        <button class="status-btn ${aClass}" onclick="toggleStatus('${p.id}', 'answer')">💬 回答${p.status.answer?'済':''}</button>
                     </div>
                 `;
                 ul.appendChild(li);
@@ -232,8 +302,7 @@
             socket.emit('request_ai_questions');
         }
         socket.on('ai_questions_result', (questions) => {
-            const box = document.getElementById('ai-hint-box');
-            box.innerHTML = "<strong>🤖 AIからの提案:</strong><br>" + questions.map(q => `・${q}`).join('<br>');
+            document.getElementById('ai-hint-box').innerHTML = "<strong>🤖 AI提案:</strong><br>" + questions.map(q => `・${q}`).join('<br>');
         });
 
         socket.on('loading_start', () => { 
@@ -242,21 +311,27 @@
         });
 
         socket.on('game_started', (data) => {
+            playStartSE();
             document.getElementById('loading-overlay').classList.add('hidden');
             showScreen('game-screen');
             document.getElementById('word-display').textContent = data.word;
+            // カードを裏面に戻す
+            document.getElementById('word-card-inner').classList.remove('flipped');
+            if(data.difficulty) changeBackground(data.difficulty);
         });
 
         socket.on('show_voting_screen', (data) => {
+            playVoteSE();
             document.getElementById('loading-overlay').classList.add('hidden');
             showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
-            const foxArea = document.getElementById('fox-challenge-area');
             div.innerHTML = '';
-            foxArea.classList.add('hidden'); 
+            
+            // 狐オーバーレイは一旦隠す（必要な人だけ出す）
+            document.getElementById('fox-challenge-overlay').classList.add('hidden');
 
             if (data.deadFoxId === socket.id) {
-                div.innerHTML = "<p>あなたは追放されました...<br>しかし、逆転のチャンスがあります！</p>";
+                div.innerHTML = "<p>あなたは追放されました...<br>逆転のチャンスを待機中...</p>";
                 return; 
             }
             
@@ -289,10 +364,15 @@
             if (!hasCandidates) div.innerHTML = "<p style='color:#999;'>投票できる相手がいません</p>";
         });
 
+        // ★狐逆転チャレンジ（オーバーレイ表示）
         socket.on('start_fox_challenge', () => {
-            document.getElementById('fox-challenge-area').classList.remove('hidden');
+            const overlay = document.getElementById('fox-challenge-overlay');
+            overlay.classList.remove('hidden');
+            
             let timeLeft = 60;
             const timerEl = document.getElementById('timer-display');
+            timerEl.textContent = timeLeft;
+            
             clearInterval(foxTimerInterval);
             foxTimerInterval = setInterval(() => {
                 timeLeft--;
@@ -309,24 +389,25 @@
         
         socket.on('fox_challenge_failed', () => {
             alert("不正解...！運命は狼投票に委ねられました。");
-            document.getElementById('fox-challenge-area').innerHTML = "<p>不正解でした。結果を待ちましょう。</p>";
+            document.getElementById('fox-challenge-overlay').innerHTML = "<h2>不正解...</h2><p>結果を待ちましょう。</p>";
         });
 
         socket.on('fox_caught', (data) => {
+            playVoteSE();
             showScreen('fox-caught-screen');
             document.getElementById('fox-victim-name').textContent = data.victimName;
         });
 
         socket.on('game_result', (data) => {
+            playResultSE();
             clearInterval(foxTimerInterval);
+            document.getElementById('fox-challenge-overlay').classList.add('hidden'); // 閉じる
             showScreen('result-screen');
+            
             const ul = document.getElementById('result-list');
             const title = document.getElementById('winner-title');
             const msg = document.getElementById('result-message');
-            const reasonBox = document.getElementById('reason-box');
-
-            // ★AI解説の表示
-            reasonBox.innerHTML = `<strong>🤖 AIの解説:</strong><br>${data.reason || '解説はありません'}`;
+            document.getElementById('reason-box').innerHTML = `<strong>🤖 AI解説:</strong><br>${data.reason || 'なし'}`;
 
             ul.innerHTML = '';
             
@@ -353,15 +434,14 @@
                 let roleT = p.role === 'villager' ? '👱村人' : (p.role === 'wolf' ? '🐺人狼' : '🦊狐');
                 let roleC = p.role === 'villager' ? 'role-villager' : (p.role === 'wolf' ? 'role-wolf' : 'role-fox');
                 const voters = p.voters && p.voters.length > 0 ? `<br><span class="voter-names">← ${p.voters.join(', ')}</span>` : '';
-                
                 let li = document.createElement('li');
                 li.innerHTML = `<div><strong>${p.name}</strong> (${p.voteCount}票)${voters}<br><span style="color:#aaa;font-size:0.8em">お題:${p.word}</span></div><div class="${roleC}">${roleT}</div>`;
                 ul.appendChild(li);
             });
         });
 
-        socket.on('reset_game', () => { showScreen('lobby-screen'); });
-        socket.on('reset_to_login', () => { showScreen('login-screen'); document.getElementById('username').value = ''; });
+        socket.on('reset_game', () => { showScreen('lobby-screen'); document.body.className = ''; });
+        socket.on('reset_to_login', () => { showScreen('login-screen'); document.getElementById('username').value = ''; document.body.className = ''; });
         socket.on('error_msg', (msg) => alert(msg));
     </script>
 </body>
