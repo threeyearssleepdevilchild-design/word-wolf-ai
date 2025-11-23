@@ -8,112 +8,21 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     
     <style>
-        :root {
-            --bg-color: #1a1a2e;
-            --card-color: #16213e;
-            --accent-color: #e94560;
-            --text-color: #ecf0f1;
-        }
-
-        body {
-            font-family: 'M PLUS Rounded 1c', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        h1 {
-            font-size: 1.8rem;
-            margin-bottom: 10px;
-            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
-        }
-
-        .box {
-            background-color: var(--card-color);
-            border-radius: 20px;
-            padding: 25px;
-            width: 100%;
-            max-width: 450px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            margin-bottom: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
+        :root { --bg-color: #1a1a2e; --card-color: #16213e; --accent-color: #e94560; --text-color: #ecf0f1; }
+        body { font-family: 'M PLUS Rounded 1c', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        .box { background-color: var(--card-color); border-radius: 20px; padding: 25px; width: 100%; max-width: 450px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none; }
-
-        input, select {
-            width: 100%;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 10px;
-            border: none;
-            background: #0f3460;
-            color: white;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        
-        button {
-            width: 100%;
-            padding: 15px;
-            margin-top: 15px;
-            border-radius: 10px;
-            border: none;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            background-color: var(--accent-color);
-            color: white;
-            transition: transform 0.1s;
-        }
-        button:active { transform: translateY(2px); }
+        input, select { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: none; background: #0f3460; color: white; font-size: 16px; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; margin-top: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; background-color: var(--accent-color); color: white; }
         button.secondary { background-color: #95a5a6; }
         button.next-btn { background-color: #4CAF50; margin-top: 20px; font-size: 1.2rem; }
-        
         button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
-        button.danger-link {
-            background: none;
-            color: #666;
-            font-size: 0.8rem;
-            margin-top: 30px;
-            padding: 5px;
-            text-decoration: underline;
-        }
-
-        #word-card {
-            background: linear-gradient(135deg, #0f3460, #16213e);
-            padding: 30px;
-            border-radius: 15px;
-            margin: 20px 0;
-            border: 2px dashed var(--accent-color);
-        }
-        #word-display {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #fff;
-        }
-
+        #word-card { background: linear-gradient(135deg, #0f3460, #16213e); padding: 30px; border-radius: 15px; margin: 20px 0; border: 2px dashed var(--accent-color); }
+        #word-display { font-size: 2.5rem; font-weight: bold; color: #fff; }
         ul { padding: 0; list-style: none; }
-        li {
-            background: rgba(255,255,255,0.05);
-            margin: 8px 0;
-            padding: 12px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .role-wolf { color: #ff6b6b; }
-        .role-fox { color: #feca57; }
-        .role-villager { color: #1dd1a1; }
-        .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        li { background: rgba(255,255,255,0.05); margin: 8px 0; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .role-wolf { color: #ff6b6b; } .role-fox { color: #feca57; } .role-villager { color: #1dd1a1; }
+        .highlight { border: 2px solid #feca57; background: rgba(254, 202, 87, 0.1); }
     </style>
 </head>
 <body>
@@ -124,26 +33,21 @@
         <p>ニックネームを入力して参加</p>
         <input type="text" id="username" placeholder="名前" />
         <button onclick="joinGame()">部屋に入る 🚪</button>
-        <div style="text-align: center;">
-            <button class="danger-link" onclick="forceReset()">⚠️ ゲームが動かなくなったらリセット</button>
-        </div>
+        <button style="background:none; color:#666; font-size:0.8em; margin-top:20px; text-decoration:underline;" onclick="if(confirm('リセットしますか？')) socket.emit('force_reset')">⚠️ 強制リセット</button>
     </div>
 
     <!-- 2. ロビー -->
     <div id="lobby-screen" class="box hidden animate__animated animate__fadeIn">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>⛺ 待機所</h2>
-            <span id="player-count" style="font-size:0.8rem; color:#aaa;">0人</span>
-        </div>
+        <div style="display: flex; justify-content: space-between;"><h2>⛺ 待機所</h2><span id="player-count">0人</span></div>
         <button class="copy-btn" onclick="copyUrl()">🔗 URLをコピー</button>
         <ul id="players-ul"></ul>
-        <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <label style="font-size: 0.9rem;">お題のジャンル</label>
+        <div style="margin-top:20px; border-top:1px solid #444; padding-top:15px;">
+            <label>お題のジャンル</label>
             <select id="difficulty">
-                <option value="easy">🐣 かんたん（子供向け）</option>
-                <option value="normal" selected>🙂 ふつう（一般）</option>
-                <option value="hard">😈 むずかしい（抽象的）</option>
-                <option value="sexy">🔞 セクシー（大人限定）</option>
+                <option value="easy">🐣 かんたん</option>
+                <option value="normal" selected>🙂 ふつう</option>
+                <option value="hard">😈 むずかしい</option>
+                <option value="sexy">🔞 セクシー</option>
             </select>
             <button onclick="startGame()">ゲーム開始 🎮</button>
         </div>
@@ -152,30 +56,38 @@
     <!-- 3. ゲーム画面 -->
     <div id="game-screen" class="box hidden animate__animated animate__zoomIn">
         <h2>あなたのお題</h2>
-        <p class="pulse" style="font-size: 0.9rem; color: #aaa;">会話中...</p>
         <div id="word-card"><div id="word-display">???</div></div>
-        <button class="secondary" onclick="socket.emit('start_voting')">✋ 投票へ進む</button>
+        <p style="font-size:0.9em; color:#aaa;">まずは「キツネ」を探してください</p>
+        <button class="secondary" onclick="socket.emit('start_voting')">✋ 議論終了・投票へ</button>
     </div>
 
     <!-- 4. 投票画面 -->
     <div id="vote-screen" class="box hidden animate__animated animate__fadeInRight">
-        <h2>👉 追放投票</h2>
+        <h2 id="vote-title">👉 追放投票</h2>
+        <p id="vote-desc">怪しい人を選んでください</p>
         <div id="vote-buttons"></div>
     </div>
     
     <!-- 5. 待機画面 -->
     <div id="wait-vote-screen" class="box hidden animate__animated animate__fadeIn">
-        <h2>🙏 祈り中...</h2>
+        <h2 id="wait-title">🙏 祈り中...</h2>
         <div style="font-size: 3rem; margin: 20px;">⌛</div>
     </div>
 
-    <!-- 6. 結果画面 -->
+    <!-- 6. 狐捕獲演出 -->
+    <div id="fox-caught-screen" class="box hidden animate__animated animate__bounceIn">
+        <h2 style="color:#feca57">🦊 キツネ確保！</h2>
+        <p>追放されたのは <strong id="fox-victim-name">???</strong> でした。<br>正体はキツネです！</p>
+        <hr>
+        <p>まだ終わりません...<br><strong>次は「人狼」を探してください！</strong></p>
+    </div>
+
+    <!-- 7. 結果画面 -->
     <div id="result-screen" class="box hidden animate__animated animate__backInUp">
-        <h2>🏆 結果発表</h2>
+        <h2 id="winner-title">🏆 結果発表</h2>
+        <p id="result-message"></p>
         <ul id="result-list"></ul>
-        
-        <!-- ここに手動リセットボタンを追加 -->
-        <button class="next-btn" onclick="nextGame()">🔄 次のゲームへ</button>
+        <button class="next-btn" onclick="nextGame()">🔄 同じメンバーで次へ</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -183,13 +95,13 @@
         const socket = io();
         const icons = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷'];
 
-        function showScreen(screenId) {
+        function showScreen(id) {
             document.querySelectorAll('.box').forEach(el => el.classList.add('hidden'));
-            const target = document.getElementById(screenId);
-            target.classList.remove('hidden');
-            target.classList.remove('animate__animated');
-            void target.offsetWidth;
-            target.classList.add('animate__animated');
+            const t = document.getElementById(id);
+            t.classList.remove('hidden');
+            t.classList.remove('animate__animated');
+            void t.offsetWidth;
+            t.classList.add('animate__animated');
         }
 
         function joinGame() {
@@ -198,43 +110,24 @@
             socket.emit('join_game', name);
         }
 
-        function startGame() {
-            const diff = document.getElementById('difficulty').value;
-            socket.emit('start_game', diff);
-        }
-        
-        function forceReset() {
-            if(confirm("本当にリセットしますか？")) socket.emit('force_reset');
-        }
-
-        // 次のゲームへ（誰かが押せば全員戻る）
-        function nextGame() {
-            socket.emit('trigger_next_game');
-        }
-
-        function copyUrl() {
-            navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました！"));
-        }
+        function startGame() { socket.emit('start_game', document.getElementById('difficulty').value); }
+        function nextGame() { socket.emit('trigger_next_game'); }
+        function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
 
         socket.on('update_players', (players) => {
             const myName = document.getElementById('username').value;
-            const amIJoined = players.some(p => p.name === myName);
-            
-            // ゲーム進行中でないならロビーへ
-            if (document.getElementById('game-screen').classList.contains('hidden') && 
-                document.getElementById('vote-screen').classList.contains('hidden') &&
-                document.getElementById('result-screen').classList.contains('hidden') &&
-                amIJoined) {
-                showScreen('lobby-screen');
+            // 名前があり、かつロビー画面待ちの状態ならロビー表示
+            if(myName && document.getElementById('login-screen').classList.contains('hidden') === false) {
+                 // 初回参加時など
+                 showScreen('lobby-screen');
             }
-
+            
+            document.getElementById('player-count').textContent = players.length + "人";
             const ul = document.getElementById('players-ul');
-            document.getElementById('player-count').textContent = players.length + "人参加中";
             ul.innerHTML = '';
-            players.forEach((p, index) => {
+            players.forEach((p, i) => {
                 const li = document.createElement('li');
-                const icon = icons[index % icons.length];
-                li.innerHTML = `<span>${icon} ${p.name}</span>`;
+                li.innerHTML = `<span>${icons[i%icons.length]} ${p.name}</span>`;
                 ul.appendChild(li);
             });
         });
@@ -244,43 +137,82 @@
             document.getElementById('word-display').textContent = data.word;
         });
 
-        socket.on('show_voting_screen', (players) => {
+        socket.on('show_voting_screen', (data) => {
             showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
             div.innerHTML = '';
-            players.forEach((p, index) => {
+            
+            // 画面の文言をフェーズごとに変える
+            if (data.phase === 'FOX') {
+                document.getElementById('vote-title').textContent = "🦊 1回戦：キツネ投票";
+                document.getElementById('vote-desc').textContent = "まずは「キツネ（会話が噛み合わない人）」を探して追放してください。";
+            } else {
+                document.getElementById('vote-title').textContent = "🐺 2回戦：人狼投票";
+                document.getElementById('vote-desc').textContent = "キツネはいなくなりました。村に紛れた「人狼（嘘をついている人）」を追放してください！";
+            }
+
+            data.players.forEach((p, i) => {
                 if(p.id === socket.id) return;
                 const btn = document.createElement('button');
-                btn.innerHTML = `${icons[index % icons.length]} <strong>${p.name}</strong> に投票`;
+                btn.innerHTML = `${icons[i%icons.length]} <strong>${p.name}</strong> に投票`;
                 btn.onclick = () => {
                     if(confirm(`${p.name} に投票しますか？`)) {
                         socket.emit('submit_vote', p.id);
                         showScreen('wait-vote-screen');
+                        document.getElementById('wait-title').textContent = (data.phase==='FOX') ? "🦊 投票待ち..." : "🐺 投票待ち...";
                     }
                 };
                 div.appendChild(btn);
             });
         });
 
-        socket.on('game_result', (players) => {
+        // 狐がつられた時の演出
+        socket.on('fox_caught', (data) => {
+            showScreen('fox-caught-screen');
+            document.getElementById('fox-victim-name').textContent = data.victimName;
+        });
+
+        socket.on('game_result', (data) => {
             showScreen('result-screen');
             const ul = document.getElementById('result-list');
+            const title = document.getElementById('winner-title');
+            const msg = document.getElementById('result-message');
+            
             ul.innerHTML = '';
-            players.sort((a, b) => b.voteCount - a.voteCount);
-            players.forEach(p => {
-                let roleT = p.role === 'villager' ? '村人' : (p.role === 'wolf' ? '人狼' : '狐');
+            
+            if (data.winner === 'FOX') {
+                title.textContent = "🦊 キツネの独り勝ち！";
+                msg.textContent = `追放された ${data.victimName} はキツネではありませんでした。`;
+                title.style.color = "#feca57";
+            } else if (data.winner === 'VILLAGE') {
+                title.textContent = "👱 村人の勝利！";
+                msg.textContent = `人狼の ${data.victimName} を追放しました！`;
+                title.style.color = "#1dd1a1";
+            } else {
+                title.textContent = "🐺 人狼の勝利！";
+                msg.textContent = `追放された ${data.victimName} は人狼ではありませんでした。`;
+                title.style.color = "#ff6b6b";
+            }
+
+            data.players.sort((a, b) => b.voteCount - a.voteCount);
+            data.players.forEach(p => {
+                let roleT = p.role === 'villager' ? '👱村人' : (p.role === 'wolf' ? '🐺人狼' : '🦊狐');
                 let roleC = p.role === 'villager' ? 'role-villager' : (p.role === 'wolf' ? 'role-wolf' : 'role-fox');
                 let li = document.createElement('li');
-                li.innerHTML = `<div><strong>${p.name}</strong> (${p.voteCount}票)<br><span style="color:#bbb;font-size:0.8em">${p.word}</span></div><div class="${roleC}">${roleT}</div>`;
+                li.innerHTML = `<div><strong>${p.name}</strong> (${p.voteCount}票)<br><span style="color:#aaa;font-size:0.8em">お題:${p.word}</span></div><div class="${roleC}">${roleT}</div>`;
                 ul.appendChild(li);
             });
         });
 
+        // ロビーに戻る
         socket.on('reset_game', () => {
-            // リセットされたらログイン画面へ（名前入力しなおしでバグ防止）
+            showScreen('lobby-screen');
+        });
+
+        // 完全リセット（ログイン画面へ）
+        socket.on('reset_to_login', () => {
             showScreen('login-screen');
             document.getElementById('username').value = '';
-            alert("ロビーに戻ります");
         });
 
         socket.on('error_msg', (msg) => alert(msg));
