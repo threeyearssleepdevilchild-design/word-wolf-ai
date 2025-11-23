@@ -8,6 +8,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
+// APIキーの空白削除
 const rawApiKey = process.env.GEMINI_API_KEY || "";
 const apiKey = rawApiKey.trim(); 
 
@@ -19,26 +20,61 @@ let players = [];
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
 
+// ★追加1: 使ったワードを記憶しておくリスト（サーバー再起動でリセット）
+let usedWordsHistory = [];
+
 // 安全なお題生成
 async function generateWords(difficulty) {
     const fallback = { village: "おにぎり", wolf: "サンドイッチ", fox: "ハンバーガー" };
     if (!apiKey) return fallback;
 
+    // ★追加2: サブジャンルをランダムに決める（マンネリ防止）
+    let subTheme = "";
+    if (difficulty === 'sexy') {
+        const sexySubThemes = [
+            "下着・ランジェリー関連",
+            "大人の道具・グッズ",
+            "夜の行為・テクニック",
+            "シチュエーション・場所",
+            "身体の部位・フェチ",
+            "大人の感情・感覚"
+        ];
+        subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
+    }
+
     let diffText = "一般向け";
     let themeText = "一般的な単語";
-    if (difficulty === 'easy') { diffText = "子供向け"; themeText = "簡単で具体的"; }
-    else if (difficulty === 'hard') { diffText = "大人向け"; themeText = "抽象的"; }
-    else if (difficulty === 'sexy') { diffText = "R-18"; themeText = "アダルトグッズ、下ネタ"; }
+    
+    if (difficulty === 'easy') { 
+        diffText = "子供向け"; themeText = "簡単で具体的"; 
+    } else if (difficulty === 'hard') { 
+        diffText = "大人向け"; themeText = "抽象的・価値観"; 
+    } else if (difficulty === 'sexy') { 
+        diffText = "R-18 (成人向け)"; 
+        themeText = `セクシー、下ネタ、アダルト要素のある単語。\n今のサブテーマ: 【${subTheme}】`; 
+    }
+
+    // ★追加3: 禁止ワードリストを作成（直近20個）
+    const bannedWords = usedWordsHistory.slice(-20).join(", ");
 
     const prompt = `
-        ワードウルフのお題を作成。
-        ターゲット: ${diffText}, テーマ: ${themeText}
-        JSON形式のみ出力(マークダウン禁止)。キー名は必ず小文字(village, wolf, fox)。
+        ワードウルフのお題を作成してください。
+        
+        【設定】
+        ターゲット: ${diffText}
+        テーマ: ${themeText}
+        
+        【重要禁止事項】
+        以下の単語は最近使ったので、今回は絶対に使わないでください:
+        [ ${bannedWords} ]
+        
+        【出力形式】
+        JSON形式のみ出力(マークダウン禁止)。キー名は必ず小文字。
         { "village":"...", "wolf":"...", "fox":"..." }
     `;
 
     try {
-        console.log(`AIリクエスト(Mode: ${difficulty})...`);
+        console.log(`AIリクエスト(Mode: ${difficulty} / Sub: ${subTheme})...`);
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
         
         const response = await fetch(url, {
@@ -46,6 +82,10 @@ async function generateWords(difficulty) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
+                // ★追加4: 温度を上げてランダム性を高める
+                generationConfig: {
+                    temperature: 1.0 // 数値が高いほど独創的になる（通常は0.7くらい）
+                },
                 safetySettings: [
                     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
                     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -64,11 +104,21 @@ async function generateWords(difficulty) {
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(text);
 
-        const v = json.village || json.Village || json.Village_word;
-        const w = json.wolf || json.Wolf || json.Wolf_word;
-        const f = json.fox || json.Fox || json.Fox_word;
+        const v = json.village || json.Village;
+        const w = json.wolf || json.Wolf;
+        const f = json.fox || json.Fox;
 
         if (!v || !w || !f) return fallback;
+
+        // ★追加5: 生成されたワードを履歴に保存
+        usedWordsHistory.push(v);
+        usedWordsHistory.push(w);
+        usedWordsHistory.push(f);
+        // メモリ節約のため履歴が多すぎたら古いものを消す
+        if (usedWordsHistory.length > 50) {
+            usedWordsHistory = usedWordsHistory.slice(-50);
+        }
+
         return { village: v, wolf: w, fox: f };
 
     } catch (error) {
@@ -88,14 +138,12 @@ io.on('connection', (socket) => {
     socket.on('join_game', (playerName) => {
         const existing = players.find(p => p.name === playerName);
         
-        // 新規プレイヤーオブジェクト（actionStatusを追加）
         const newPlayer = { 
             id: socket.id, 
             name: playerName, 
             role: '', 
             word: '', 
             voteCount: 0,
-            // ★追加：議論状況のステータス
             status: { question: false, answer: false }
         };
 
@@ -107,7 +155,6 @@ io.on('connection', (socket) => {
             if (existing) {
                 existing.id = socket.id;
                 socket.emit('game_started', { word: existing.word });
-                // 途中参加時も現在の状況を送る
                 socket.emit('update_game_status', players); 
                 if(gameState.startsWith('VOTING')) socket.emit('show_voting_screen', { players, phase: gameState });
                 if(gameState === 'RESULT') socket.emit('game_result', { players, winner: 'unknown' });
@@ -125,10 +172,9 @@ io.on('connection', (socket) => {
         gameState = 'PLAYING';
         votesReceived = 0;
         
-        // 初期化（ステータスもリセット）
         players.forEach(p => { 
             p.voteCount = 0;
-            p.status = { question: false, answer: false }; // リセット
+            p.status = { question: false, answer: false };
         });
 
         const words = await generateWords(diff);
@@ -144,19 +190,14 @@ io.on('connection', (socket) => {
         });
         players = shuffled;
         
-        // ★ゲーム開始時に全員のステータスリストを配信
         io.emit('update_game_status', players);
     });
 
-    // ★追加：質問・回答ボタンが押された時の処理
     socket.on('toggle_action', ({ targetId, type }) => {
         const target = players.find(p => p.id === targetId);
         if (target) {
-            // true/false を反転させる
             if (type === 'question') target.status.question = !target.status.question;
             if (type === 'answer') target.status.answer = !target.status.answer;
-            
-            // 全員に新しい状態を配信
             io.emit('update_game_status', players);
         }
     });
@@ -203,7 +244,7 @@ io.on('connection', (socket) => {
         votesReceived = 0;
         players.forEach(p => { 
             p.role=''; p.word=''; p.voteCount=0;
-            p.status = { question: false, answer: false }; // ステータスリセット
+            p.status = { question: false, answer: false };
         });
         io.emit('reset_game'); 
         io.emit('update_players', players);
@@ -211,6 +252,7 @@ io.on('connection', (socket) => {
 
     socket.on('force_reset', () => {
         players = []; gameState = 'WAITING'; votesReceived = 0;
+        // 履歴もリセットしたければここで usedWordsHistory = []; を入れる
         io.emit('reset_to_login'); 
     });
 
