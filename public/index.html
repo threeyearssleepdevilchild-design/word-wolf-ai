@@ -12,7 +12,6 @@
         body { font-family: 'M PLUS Rounded 1c', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
         .box { background-color: var(--card-color); border-radius: 20px; padding: 25px; width: 100%; max-width: 450px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
         
-        /* ★修正: !important をつけて、何があっても隠れるようにしました */
         .hidden { display: none !important; }
 
         input, select { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: none; background: #0f3460; color: white; font-size: 16px; box-sizing: border-box; }
@@ -40,7 +39,6 @@
 <body>
     <h1 class="animate__animated animate__fadeInDown">🦊 AIワードウルフ 🐺</h1>
 
-    <!-- 最初はhiddenがついているので消えるはず -->
     <div id="loading-overlay" class="hidden">
         <div class="spinner"></div>
         <p>AIがお題を考えています...<br>🧠💭</p>
@@ -135,11 +133,18 @@
         function nextGame() { socket.emit('trigger_next_game'); }
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
 
+        // --- イベント ---
+
         socket.on('update_players', (players) => {
             const myName = document.getElementById('username').value;
-            if(myName && document.getElementById('login-screen').classList.contains('hidden') === false) {
+            // ★修正ポイント: 入力欄に文字があるだけでなく、「サーバーリストに自分のIDがあるか」をチェック
+            const amIJoined = players.some(p => p.id === socket.id);
+
+            // ログイン画面にいて、かつ自分が参加済みリストにいる場合のみロビーへ移動
+            if(amIJoined && document.getElementById('login-screen').classList.contains('hidden') === false) {
                  showScreen('lobby-screen');
             }
+            
             document.getElementById('player-count').textContent = players.length + "人";
             const ul = document.getElementById('players-ul');
             ul.innerHTML = '';
@@ -196,8 +201,12 @@
                 document.getElementById('vote-desc').textContent = "嘘をついている「人狼」を探してください！";
             }
 
+            // 自分以外のプレイヤーのボタンを作る
+            let hasCandidates = false;
             data.players.forEach((p, i) => {
-                if(p.id === socket.id) return;
+                if(p.id === socket.id) return; // 自分には投票できない
+                hasCandidates = true;
+                
                 const btn = document.createElement('button');
                 btn.innerHTML = `${icons[i%icons.length]} <strong>${p.name}</strong> に投票`;
                 btn.onclick = () => {
@@ -209,6 +218,11 @@
                 };
                 div.appendChild(btn);
             });
+            
+            // ★万が一、投票相手がいない場合（テストなどで一人でやっている時など）
+            if (!hasCandidates) {
+                div.innerHTML = "<p style='color:#999;'>投票できる相手がいません<br>(自分以外の参加者が必要です)</p>";
+            }
         });
 
         socket.on('fox_caught', (data) => {
