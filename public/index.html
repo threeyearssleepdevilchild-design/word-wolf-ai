@@ -18,17 +18,27 @@
         button.next-btn { background-color: #4CAF50; margin-top: 20px; font-size: 1.2rem; }
         button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
         
-        /* ガチャボタンエリア */
         .gacha-container { display: flex; gap: 10px; margin-top: 20px; }
         .gacha-btn { flex: 1; border: 2px solid #fff; color: #333; font-size: 0.9rem; padding: 10px; }
-        .gacha-q { background: linear-gradient(45deg, #ff9a9e, #fecfef); } /* 質問用ピンク系 */
-        .gacha-a { background: linear-gradient(45deg, #a18cd1, #fbc2eb); } /* 回答用パープル系 */
+        .gacha-q { background: linear-gradient(45deg, #ff9a9e, #fecfef); }
+        .gacha-a { background: linear-gradient(45deg, #a18cd1, #fbc2eb); }
+
+        /* AI質問ボタン */
+        .ai-hint-btn { background: #3498db; margin-bottom: 15px; font-size: 0.9rem; }
+        .ai-hint-list { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; text-align: left; font-size: 0.9rem; color: #add8e6; }
+        
+        /* 狐逆転画面 */
+        #fox-challenge-area { background: #2c0b0e; border: 2px solid #ff6b6b; padding: 15px; border-radius: 10px; margin-top: 20px; }
+        #fox-input { background: #5a1e23; border: 1px solid #ff6b6b; color: white; }
+        #timer-display { font-size: 2rem; color: #ff6b6b; font-weight: bold; }
 
         #word-card { background: linear-gradient(135deg, #0f3460, #16213e); padding: 30px; border-radius: 15px; margin: 20px 0; border: 2px dashed var(--accent-color); }
         #word-display { font-size: 2.5rem; font-weight: bold; color: #fff; }
         ul { padding: 0; list-style: none; }
         li { background: rgba(255,255,255,0.05); margin: 8px 0; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        
         .role-wolf { color: #ff6b6b; } .role-fox { color: #feca57; } .role-villager { color: #1dd1a1; }
+        .voter-names { font-size: 0.75rem; color: #aaa; display: block; text-align: right; margin-top: 3px; }
         
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
         .spinner { width: 50px; height: 50px; border: 5px solid rgba(233, 69, 96, 0.3); border-top: 5px solid #e94560; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
@@ -46,7 +56,7 @@
 
     <div id="loading-overlay" class="hidden">
         <div class="spinner"></div>
-        <p>AIがお題を考えています...<br>🧠💭</p>
+        <p>AIが思考中...<br>🧠💭</p>
     </div>
 
     <!-- 1. 名前入力 -->
@@ -79,12 +89,14 @@
         <h2>あなたのお題</h2>
         <div id="word-card"><div id="word-display">???</div></div>
         
-        <!-- ★追加: 指名ガチャボタン2種 -->
+        <!-- AI質問提案機能 -->
+        <button class="ai-hint-btn" onclick="requestAiHint()">💡 質問案をAIに聞く</button>
+        <div id="ai-hint-box" class="hidden ai-hint-list"></div>
+
         <div class="gacha-container">
             <button class="gacha-btn gacha-q" onclick="socket.emit('trigger_random_pick', {type: 'question'})">🎲 質問者を指名</button>
             <button class="gacha-btn gacha-a" onclick="socket.emit('trigger_random_pick', {type: 'answer'})">🎲 回答者を指名</button>
         </div>
-        <p style="font-size:0.8em; color:#aaa; margin-bottom:20px;">未実施の人から優先して選ばれます</p>
 
         <p style="font-size:0.9em; color:#aaa; margin-bottom: 5px;">議論の進捗チェック</p>
         <ul id="game-players-ul" class="game-player-list"></ul>
@@ -97,12 +109,22 @@
         <h2 id="vote-title">👉 追放投票</h2>
         <p id="vote-desc">怪しい人を選んでください</p>
         <div id="vote-buttons"></div>
+        
+        <!-- 狐逆転チャレンジ画面（狐のみ表示） -->
+        <div id="fox-challenge-area" class="hidden">
+            <h3 style="color:#feca57; margin:0;">🦊 大逆転チャレンジ</h3>
+            <p>村人たちのワードを予想して入力せよ！<br>当たれば即勝利！</p>
+            <div id="timer-display">60</div>
+            <input type="text" id="fox-input" placeholder="予想ワード（例：うどん）">
+            <button onclick="submitFoxGuess()" style="background:#d32f2f;">🔥 決定！</button>
+        </div>
     </div>
     
     <!-- 5. 待機画面 -->
     <div id="wait-vote-screen" class="box hidden animate__animated animate__fadeIn">
         <h2 id="wait-title">🙏 祈り中...</h2>
         <div style="font-size: 3rem; margin: 20px;">⌛</div>
+        <p id="wait-msg"></p>
     </div>
 
     <!-- 6. 狐捕獲演出 -->
@@ -125,6 +147,7 @@
     <script>
         const socket = io();
         const icons = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷'];
+        let foxTimerInterval;
 
         function showScreen(id) {
             document.querySelectorAll('.box').forEach(el => el.classList.add('hidden'));
@@ -183,24 +206,28 @@
             });
         });
 
-        // ★追加: 指名結果の表示（出し分け）
         socket.on('random_pick_result', (data) => {
-            let title = "👉 指名されたのは...";
-            let roleText = "";
-            
-            if (data.type === 'question') {
-                title = "🎲 次の【質問者】を指名！";
-                roleText = "質問をお願いします！";
-            } else if (data.type === 'answer') {
-                title = "🎲 次の【回答者】を指名！";
-                roleText = "回答をお願いします！";
-            }
-            
-            alert(`${title}\n\n👉 【 ${data.name} 】さん\n\n${roleText}`);
+            let title = data.type === 'question' ? "🎲 次の【質問者】" : "🎲 次の【回答者】";
+            alert(`${title}は...\n\n👉 【 ${data.name} 】さん\n\nお願いします！`);
         });
 
         function toggleStatus(targetId, type) { socket.emit('toggle_action', { targetId, type }); }
-        socket.on('loading_start', () => { document.getElementById('loading-overlay').classList.remove('hidden'); });
+        
+        // ★AI質問機能
+        function requestAiHint() {
+            document.getElementById('ai-hint-box').innerHTML = "考え中...";
+            document.getElementById('ai-hint-box').classList.remove('hidden');
+            socket.emit('request_ai_questions');
+        }
+        socket.on('ai_questions_result', (questions) => {
+            const box = document.getElementById('ai-hint-box');
+            box.innerHTML = "<strong>🤖 AIからの提案:</strong><br>" + questions.map(q => `・${q}`).join('<br>');
+        });
+
+        socket.on('loading_start', () => { 
+            document.getElementById('loading-overlay').classList.remove('hidden'); 
+            document.getElementById('ai-hint-box').classList.add('hidden'); // ヒントリセット
+        });
 
         socket.on('game_started', (data) => {
             document.getElementById('loading-overlay').classList.add('hidden');
@@ -212,30 +239,68 @@
             document.getElementById('loading-overlay').classList.add('hidden');
             showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
+            const foxArea = document.getElementById('fox-challenge-area');
             div.innerHTML = '';
+            foxArea.classList.add('hidden'); // 初期状態は隠す
+
+            // ★死んだ狐の場合の処理
+            if (data.deadFoxId === socket.id) {
+                div.innerHTML = "<p>あなたは追放されました...<br>しかし、逆転のチャンスがあります！</p>";
+                return; // ボタンは出さない
+            }
+            
             if (data.phase === 'FOX') {
                 document.getElementById('vote-title').textContent = "🦊 1回戦：キツネ投票";
                 document.getElementById('vote-desc').textContent = "会話が噛み合わない「キツネ」を探してください";
             } else {
                 document.getElementById('vote-title').textContent = "🐺 2回戦：人狼投票";
-                document.getElementById('vote-desc').textContent = "嘘をついている「人狼」を探してください！";
+                document.getElementById('vote-desc').textContent = "キツネはいなくなりました。人狼を探してください！";
             }
+
             let hasCandidates = false;
             data.players.forEach((p, i) => {
-                if(p.id === socket.id) return;
+                if(p.id === socket.id) return; 
+                if(p.id === data.deadFoxId) return; // ★死んだ狐には投票できない
                 hasCandidates = true;
                 const btn = document.createElement('button');
                 btn.innerHTML = `${icons[i%icons.length]} <strong>${p.name}</strong> に投票`;
                 btn.onclick = () => {
                     if(confirm(`${p.name} に投票しますか？`)) {
-                        socket.emit('submit_vote', p.id);
+                        socket.emit('submit_vote', { targetId: p.id, voterId: socket.id });
                         showScreen('wait-vote-screen');
                         document.getElementById('wait-title').textContent = (data.phase==='FOX') ? "🦊 投票待ち..." : "🐺 投票待ち...";
+                        document.getElementById('wait-msg').textContent = "";
+                        // ★死んだ狐がいるフェーズならメッセージ追加
+                        if(data.deadFoxId) document.getElementById('wait-msg').textContent = "キツネが逆転チャレンジ中です...";
                     }
                 };
                 div.appendChild(btn);
             });
             if (!hasCandidates) div.innerHTML = "<p style='color:#999;'>投票できる相手がいません</p>";
+        });
+
+        // ★狐逆転チャレンジ開始
+        socket.on('start_fox_challenge', () => {
+            document.getElementById('fox-challenge-area').classList.remove('hidden');
+            let timeLeft = 60;
+            const timerEl = document.getElementById('timer-display');
+            clearInterval(foxTimerInterval);
+            foxTimerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.textContent = timeLeft;
+                if(timeLeft <= 0) clearInterval(foxTimerInterval);
+            }, 1000);
+        });
+
+        function submitFoxGuess() {
+            const guess = document.getElementById('fox-input').value;
+            if(!guess) return;
+            socket.emit('submit_fox_guess', guess);
+        }
+        
+        socket.on('fox_challenge_failed', () => {
+            alert("不正解...！運命は狼投票に委ねられました。");
+            document.getElementById('fox-challenge-area').innerHTML = "<p>不正解でした。結果を待ちましょう。</p>";
         });
 
         socket.on('fox_caught', (data) => {
@@ -244,12 +309,18 @@
         });
 
         socket.on('game_result', (data) => {
+            clearInterval(foxTimerInterval);
             showScreen('result-screen');
             const ul = document.getElementById('result-list');
             const title = document.getElementById('winner-title');
             const msg = document.getElementById('result-message');
             ul.innerHTML = '';
-            if (data.winner === 'FOX') {
+            
+            if (data.winner === 'FOX_REVERSE') {
+                title.textContent = "🦊 キツネの大逆転勝利！";
+                msg.textContent = `キツネの ${data.victimName} がワード「${data.guessWord}」を見抜きました！`;
+                title.style.color = "#feca57";
+            } else if (data.winner === 'FOX') {
                 title.textContent = "🦊 キツネの独り勝ち！";
                 msg.textContent = `追放された ${data.victimName} はキツネではありませんでした。`;
                 title.style.color = "#feca57";
@@ -262,12 +333,16 @@
                 msg.textContent = `追放された ${data.victimName} は人狼ではありませんでした。`;
                 title.style.color = "#ff6b6b";
             }
+
             data.players.sort((a, b) => b.voteCount - a.voteCount);
             data.players.forEach(p => {
                 let roleT = p.role === 'villager' ? '👱村人' : (p.role === 'wolf' ? '🐺人狼' : '🦊狐');
                 let roleC = p.role === 'villager' ? 'role-villager' : (p.role === 'wolf' ? 'role-wolf' : 'role-fox');
+                // ★投票先の表示
+                const voters = p.voters && p.voters.length > 0 ? `<br><span class="voter-names">← ${p.voters.join(', ')}</span>` : '';
+                
                 let li = document.createElement('li');
-                li.innerHTML = `<div><strong>${p.name}</strong> (${p.voteCount}票)<br><span style="color:#aaa;font-size:0.8em">お題:${p.word}</span></div><div class="${roleC}">${roleT}</div>`;
+                li.innerHTML = `<div><strong>${p.name}</strong> (${p.voteCount}票)${voters}<br><span style="color:#aaa;font-size:0.8em">お題:${p.word}</span></div><div class="${roleC}">${roleT}</div>`;
                 ul.appendChild(li);
             });
         });
