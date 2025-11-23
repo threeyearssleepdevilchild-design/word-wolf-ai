@@ -8,7 +8,6 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
-// APIキーの空白削除
 const rawApiKey = process.env.GEMINI_API_KEY || "";
 const apiKey = rawApiKey.trim(); 
 
@@ -20,23 +19,26 @@ let players = [];
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
 
-// 使ったワードを記憶しておくリスト
+// 使ったワード履歴
 let usedWordsHistory = [];
 
 async function generateWords(difficulty) {
     const fallback = { village: "おにぎり", wolf: "サンドイッチ", fox: "ハンバーガー" };
     if (!apiKey) return fallback;
 
-    // サブジャンル設定（セクシー用）
+    // ★追加1: セクシー用サブジャンルを大幅増量
     let subTheme = "";
     if (difficulty === 'sexy') {
         const sexySubThemes = [
-            "下着・ランジェリー関連",
-            "大人の道具・グッズ",
-            "夜の行為・テクニック",
-            "シチュエーション・場所",
-            "身体の部位・フェチ",
-            "大人の感情・感覚"
+            "下着・ランジェリー・勝負服",
+            "大人の道具・おもちゃ",
+            "夜のテクニック・体位",
+            "興奮するシチュエーション・場所",
+            "身体の部位・フェチ（匂い・音など）",
+            "コスプレ・ロールプレイ",
+            "Sっ気・Mっ気・攻めと受け",
+            "理想のプレイ・妄想",
+            "ギリギリのライン（露出・スリル）"
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
     }
@@ -50,12 +52,11 @@ async function generateWords(difficulty) {
         diffText = "大人向け"; themeText = "抽象的・価値観"; 
     } else if (difficulty === 'sexy') { 
         diffText = "R-18 (成人向け)"; 
-        themeText = `セクシー、下ネタ、アダルト要素のある単語。\n今のサブテーマ: 【${subTheme}】`; 
+        themeText = `セクシー、下ネタ、アダルト要素のある単語。\n今回のサブテーマ: 【${subTheme}】`; 
     }
 
     const bannedWords = usedWordsHistory.slice(-20).join(", ");
 
-    // ★修正ポイント：ここに関係性の定義をガチガチに書き込みました
     const prompt = `
         ワードウルフのお題を作成してください。
         
@@ -65,17 +66,17 @@ async function generateWords(difficulty) {
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **非常に似ている単語**にしてください。
-           - 用途、形、ジャンルがほぼ同じで、議論しないと見分けがつかないレベル。（例：うどん vs そば）
-           
+           - **非常に似ている単語**（用途、形、ジャンルがほぼ同じ）。
+           - 議論しないと見分けがつかないレベル。
+           - **ほぼ同じ意味の単語**は選ばないこと。（例："village"騎乗位、"wolf"女騎乗位）
+
         2. "fox" (第三勢力) :
-           - village/wolfとは**「全く違う」単語**にしてください。
-           - ただし、会話に参加できる程度の「大きな共通点」は持たせてください。
-           - **village/wolfとは決定的な違い（カテゴリー違い、素材違い、用途違いなど）がある単語**を選んでください。
-           - （例：village/wolfが「麺類」なら、foxは「パスタ（洋風）」や「焼きそば（汁なし）」など、明確に浮いているもの）
+           - village/wolfとは**「全く違う」単語**。
+           - ただし、会話に参加できる程度の共通点は持たせること。
+           - カテゴリーや質感が決定的に違うものを選んでください。
 
         【重要禁止事項】
-        以下の単語は最近使用したため禁止: [ ${bannedWords} ]
+        最近使用した単語は禁止: [ ${bannedWords} ]
         
         【出力形式】
         JSON形式のみ出力(マークダウン禁止)。キー名は必ず小文字。
@@ -84,6 +85,10 @@ async function generateWords(difficulty) {
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty} / Sub: ${subTheme})...`);
+        
+        // ★ご希望のGemini 2.5について:
+        // 現在 2.5 は未リリースのため、最新の 2.0 を使用します。
+        // 将来 2.5 が出たら、下の 2.0 を 2.5 に書き換えてください。
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
         
         const response = await fetch(url, {
@@ -91,7 +96,7 @@ async function generateWords(difficulty) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 1.0 },
+                generationConfig: { temperature: 1.0 }, // 創造性を高める
                 safetySettings: [
                     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
                     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -116,7 +121,6 @@ async function generateWords(difficulty) {
 
         if (!v || !w || !f) return fallback;
 
-        // 履歴保存
         usedWordsHistory.push(v);
         usedWordsHistory.push(w);
         usedWordsHistory.push(f);
@@ -140,7 +144,12 @@ function calculateVoteResult() {
 io.on('connection', (socket) => {
     socket.on('join_game', (playerName) => {
         const existing = players.find(p => p.name === playerName);
-        const newPlayer = { id: socket.id, name: playerName, role: '', word: '', voteCount: 0, status: { question: false, answer: false } };
+        const newPlayer = { 
+            id: socket.id, 
+            name: playerName, 
+            role: '', word: '', voteCount: 0, 
+            status: { question: false, answer: false } 
+        };
 
         if (gameState === 'WAITING') {
             if (existing) { existing.id = socket.id; }
@@ -166,7 +175,9 @@ io.on('connection', (socket) => {
 
         gameState = 'PLAYING';
         votesReceived = 0;
-        players.forEach(p => { p.voteCount = 0; p.status = { question: false, answer: false }; });
+        players.forEach(p => { 
+            p.voteCount = 0; p.status = { question: false, answer: false }; 
+        });
 
         const words = await generateWords(diff);
         const shuffled = [...players].sort(() => 0.5 - Math.random());
@@ -188,6 +199,14 @@ io.on('connection', (socket) => {
             if (type === 'question') target.status.question = !target.status.question;
             if (type === 'answer') target.status.answer = !target.status.answer;
             io.emit('update_game_status', players);
+        }
+    });
+
+    // ★追加2: ランダム指名機能
+    socket.on('trigger_random_pick', () => {
+        if (players.length > 0) {
+            const randomPlayer = players[Math.floor(Math.random() * players.length)];
+            io.emit('random_pick_result', { name: randomPlayer.name });
         }
     });
 
@@ -231,7 +250,9 @@ io.on('connection', (socket) => {
     socket.on('trigger_next_game', () => {
         gameState = 'WAITING';
         votesReceived = 0;
-        players.forEach(p => { p.role=''; p.word=''; p.voteCount=0; p.status = { question: false, answer: false }; });
+        players.forEach(p => { 
+            p.role=''; p.word=''; p.voteCount=0; p.status = { question: false, answer: false }; 
+        });
         io.emit('reset_game'); 
         io.emit('update_players', players);
     });

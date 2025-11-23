@@ -11,14 +11,15 @@
         :root { --bg-color: #1a1a2e; --card-color: #16213e; --accent-color: #e94560; --text-color: #ecf0f1; }
         body { font-family: 'M PLUS Rounded 1c', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
         .box { background-color: var(--card-color); border-radius: 20px; padding: 25px; width: 100%; max-width: 450px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
-        
         .hidden { display: none !important; }
-
         input, select { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: none; background: #0f3460; color: white; font-size: 16px; box-sizing: border-box; }
         button { width: 100%; padding: 15px; margin-top: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; background-color: var(--accent-color); color: white; }
         button.secondary { background-color: #95a5a6; }
         button.next-btn { background-color: #4CAF50; margin-top: 20px; font-size: 1.2rem; }
         button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
+        /* ガチャボタンの色 */
+        button.gacha-btn { background: linear-gradient(45deg, #FFD700, #FFA500); color: #333; margin-top: 20px; border: 2px solid #fff; }
+
         #word-card { background: linear-gradient(135deg, #0f3460, #16213e); padding: 30px; border-radius: 15px; margin: 20px 0; border: 2px dashed var(--accent-color); }
         #word-display { font-size: 2.5rem; font-weight: bold; color: #fff; }
         ul { padding: 0; list-style: none; }
@@ -74,6 +75,10 @@
         <h2>あなたのお題</h2>
         <div id="word-card"><div id="word-display">???</div></div>
         
+        <!-- ★追加: 指名ガチャボタン -->
+        <button class="gacha-btn" onclick="socket.emit('trigger_random_pick')">🎲 誰かひとりを指名！</button>
+        <p style="font-size:0.8em; color:#aaa; margin-bottom:20px;">会話に詰まったら押してください</p>
+
         <p style="font-size:0.9em; color:#aaa; margin-bottom: 5px;">議論の進捗チェック</p>
         <ul id="game-players-ul" class="game-player-list"></ul>
 
@@ -133,18 +138,12 @@
         function nextGame() { socket.emit('trigger_next_game'); }
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
 
-        // --- イベント ---
-
         socket.on('update_players', (players) => {
             const myName = document.getElementById('username').value;
-            // ★修正ポイント: 入力欄に文字があるだけでなく、「サーバーリストに自分のIDがあるか」をチェック
             const amIJoined = players.some(p => p.id === socket.id);
-
-            // ログイン画面にいて、かつ自分が参加済みリストにいる場合のみロビーへ移動
             if(amIJoined && document.getElementById('login-screen').classList.contains('hidden') === false) {
                  showScreen('lobby-screen');
             }
-            
             document.getElementById('player-count').textContent = players.length + "人";
             const ul = document.getElementById('players-ul');
             ul.innerHTML = '';
@@ -177,8 +176,13 @@
             });
         });
 
-        function toggleStatus(targetId, type) { socket.emit('toggle_action', { targetId, type }); }
+        // ★追加: 指名ガチャの結果表示
+        socket.on('random_pick_result', (data) => {
+            // アラートだと操作が止まるので、簡易的にアラートで通知、あるいは画面に表示
+            alert(`🎲 指名されたのは...\n\n👉 【 ${data.name} 】さん\n\n次の質問や回答をお願いします！`);
+        });
 
+        function toggleStatus(targetId, type) { socket.emit('toggle_action', { targetId, type }); }
         socket.on('loading_start', () => { document.getElementById('loading-overlay').classList.remove('hidden'); });
 
         socket.on('game_started', (data) => {
@@ -192,7 +196,6 @@
             showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
             div.innerHTML = '';
-            
             if (data.phase === 'FOX') {
                 document.getElementById('vote-title').textContent = "🦊 1回戦：キツネ投票";
                 document.getElementById('vote-desc').textContent = "会話が噛み合わない「キツネ」を探してください";
@@ -200,13 +203,10 @@
                 document.getElementById('vote-title').textContent = "🐺 2回戦：人狼投票";
                 document.getElementById('vote-desc').textContent = "嘘をついている「人狼」を探してください！";
             }
-
-            // 自分以外のプレイヤーのボタンを作る
             let hasCandidates = false;
             data.players.forEach((p, i) => {
-                if(p.id === socket.id) return; // 自分には投票できない
+                if(p.id === socket.id) return;
                 hasCandidates = true;
-                
                 const btn = document.createElement('button');
                 btn.innerHTML = `${icons[i%icons.length]} <strong>${p.name}</strong> に投票`;
                 btn.onclick = () => {
@@ -218,11 +218,7 @@
                 };
                 div.appendChild(btn);
             });
-            
-            // ★万が一、投票相手がいない場合（テストなどで一人でやっている時など）
-            if (!hasCandidates) {
-                div.innerHTML = "<p style='color:#999;'>投票できる相手がいません<br>(自分以外の参加者が必要です)</p>";
-            }
+            if (!hasCandidates) div.innerHTML = "<p style='color:#999;'>投票できる相手がいません</p>";
         });
 
         socket.on('fox_caught', (data) => {
@@ -235,7 +231,6 @@
             const ul = document.getElementById('result-list');
             const title = document.getElementById('winner-title');
             const msg = document.getElementById('result-message');
-            
             ul.innerHTML = '';
             if (data.winner === 'FOX') {
                 title.textContent = "🦊 キツネの独り勝ち！";
@@ -250,7 +245,6 @@
                 msg.textContent = `追放された ${data.victimName} は人狼ではありませんでした。`;
                 title.style.color = "#ff6b6b";
             }
-
             data.players.sort((a, b) => b.voteCount - a.voteCount);
             data.players.forEach(p => {
                 let roleT = p.role === 'villager' ? '👱村人' : (p.role === 'wolf' ? '🐺人狼' : '🦊狐');
