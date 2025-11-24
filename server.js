@@ -49,16 +49,12 @@ async function generateWords(difficulty) {
             "大人の道具・おもちゃ",
             "夜のテクニック・体位",
             "興奮するシチュエーション・場所",
-            "身体の部位・フェチ（匂い・胸・尻など）",
+            "身体の部位（胸・尻など）・フェチ（匂いなど）",
             "コスプレ・ロールプレイ",
-            "Sっ気・Mっ気・攻めと受け",
-            "理想のプレイ・妄想",
+            "Sっ気・Mっ気・攻めと受け・痴女",
             "ギリギリのライン（露出・スリル）",
-            "浮気・不倫・修羅場",
-            "初体験・過去の恋愛",
-            "オフィスラブ・社内恋愛",
-            "マッチングアプリ・ワンナイト",
-            "絶対に知られたくない性癖"
+            "浮気・不倫・修羅場・寝取られ",
+
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
     }
@@ -98,7 +94,7 @@ async function generateWords(difficulty) {
     try {
         console.log(`AIリクエスト(Mode: ${difficulty})...`);
         // ★修正: 2.5 -> 2.0 に戻しました（これで確実に動きます）
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -140,7 +136,7 @@ async function generateAiQuestions(word) {
     `;
     try {
         // ★修正: ここも 2.0 に戻しました
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
