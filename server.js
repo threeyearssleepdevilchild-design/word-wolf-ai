@@ -97,7 +97,7 @@ async function generateWords(difficulty) {
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty})...`);
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -138,7 +138,7 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
