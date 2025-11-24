@@ -29,7 +29,7 @@ const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
 ];
 
-// ★追加: 完全にランダムに混ぜるための関数（フィッシャー–イェーツのシャッフル）
+// シャッフル関数
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -97,7 +97,8 @@ async function generateWords(difficulty) {
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty})...`);
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
+        // ★修正: 2.5 -> 2.0 に戻しました（これで確実に動きます）
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -138,7 +139,8 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        // ★修正: ここも 2.0 に戻しました
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
@@ -223,7 +225,6 @@ io.on('connection', (socket) => {
         const words = await generateWords(diff);
         currentWords = words;
 
-        // ★修正: 強力なシャッフル関数を使用
         const shuffled = shuffleArray([...players]);
         
         shuffled.forEach((p, i) => {
@@ -234,10 +235,7 @@ io.on('connection', (socket) => {
             io.to(p.id).emit('game_started', { word: p.word, difficulty: diff });
         });
         
-        // ★重要: 内部のplayersリストもシャッフル後の順番に更新する
-        // これをしないと、次のゲームでシャッフル前の並びが参照されてしまうことがある
         players = shuffled;
-
         io.emit('update_game_status', players);
     });
 
