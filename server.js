@@ -17,7 +17,7 @@ app.use(express.static('public'));
 let players = []; 
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
-let usedWordsHistory = []; // 使用済みワード履歴
+let usedWordsHistory = []; 
 let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
 let currentDifficulty = 'sexy';
@@ -28,6 +28,15 @@ const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
 ];
+
+// ★追加: 完全にランダムに混ぜるための関数（フィッシャー–イェーツのシャッフル）
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
 
 async function generateWords(difficulty) {
     const fallback = { village: "おにぎり", wolf: "サンドイッチ", fox: "ハンバーガー", reason: "予備データ" };
@@ -40,11 +49,16 @@ async function generateWords(difficulty) {
             "大人の道具・おもちゃ",
             "夜のテクニック・体位",
             "興奮するシチュエーション・場所",
-            "身体の部位（胸・尻・乳首など）・フェチ（匂い・顔射など）",
+            "身体の部位・フェチ（匂い・胸・尻など）",
             "コスプレ・ロールプレイ",
-            "Sっ気・Mっ気・攻めと受け・痴女・淫乱",
+            "Sっ気・Mっ気・攻めと受け",
+            "理想のプレイ・妄想",
             "ギリギリのライン（露出・スリル）",
-            "浮気・不倫・修羅場・寝取られ",
+            "浮気・不倫・修羅場",
+            "初体験・過去の恋愛",
+            "オフィスラブ・社内恋愛",
+            "マッチングアプリ・ワンナイト",
+            "絶対に知られたくない性癖"
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
     }
@@ -55,7 +69,6 @@ async function generateWords(difficulty) {
     else if (difficulty === 'hard') { diffText = "大人向け"; themeText = "抽象的"; }
     else if (difficulty === 'sexy') { diffText = "R-18 (成人向け)"; themeText = `セクシー、下ネタ。サブテーマ:【${subTheme}】`; }
 
-    // ★変更点1: 過去50ゲーム分（150単語）すべてを禁止リストに入れる
     const bannedWords = usedWordsHistory.join(", ");
 
     const prompt = `
@@ -84,7 +97,7 @@ async function generateWords(difficulty) {
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty})...`);
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -108,10 +121,8 @@ async function generateWords(difficulty) {
 
         if (!v || !w || !f) return fallback;
 
-        // ★変更点2: 履歴保存数を150個（50ゲーム×3単語）に拡張
         usedWordsHistory.push(v, w, f);
         if (usedWordsHistory.length > 150) {
-            // 古いものから削除して150個に保つ
             usedWordsHistory = usedWordsHistory.slice(-150);
         }
 
@@ -127,7 +138,7 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
@@ -162,9 +173,15 @@ io.on('connection', (socket) => {
                 existing.id = socket.id;
                 socket.emit('game_started', { word: existing.word, difficulty: currentDifficulty });
                 socket.emit('update_game_status', players); 
-                if(gameState.startsWith('VOTING')) socket.emit('show_voting_screen', { players, phase: gameState, deadFoxId });
+                
+                if(gameState.startsWith('VOTING')) {
+                    socket.emit('show_voting_screen', { players, phase: gameState, deadFoxId });
+                }
                 if(gameState === 'RESULT') socket.emit('game_result', { players, winner: 'unknown', reason: currentWords.reason });
-                if(existing.id === deadFoxId && gameState === 'VOTING_WOLF') socket.emit('start_fox_challenge');
+                
+                if(existing.id === deadFoxId && gameState === 'VOTING_WOLF') {
+                    socket.emit('start_fox_challenge');
+                }
                 io.emit('update_players', players);
             } else {
                 socket.emit('error_msg', 'ゲーム進行中です');
@@ -206,7 +223,9 @@ io.on('connection', (socket) => {
         const words = await generateWords(diff);
         currentWords = words;
 
-        const shuffled = [...players].sort(() => 0.5 - Math.random());
+        // ★修正: 強力なシャッフル関数を使用
+        const shuffled = shuffleArray([...players]);
+        
         shuffled.forEach((p, i) => {
             if (i === 0) { p.role = 'wolf'; p.word = words.wolf; }
             else if (i === 1) { p.role = 'fox'; p.word = words.fox; }
@@ -214,7 +233,11 @@ io.on('connection', (socket) => {
             if (!p.word) p.word = "エラー";
             io.to(p.id).emit('game_started', { word: p.word, difficulty: diff });
         });
+        
+        // ★重要: 内部のplayersリストもシャッフル後の順番に更新する
+        // これをしないと、次のゲームでシャッフル前の並びが参照されてしまうことがある
         players = shuffled;
+
         io.emit('update_game_status', players);
     });
 
