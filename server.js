@@ -22,6 +22,16 @@ let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
 let currentDifficulty = 'sexy';
 
+// ★追加1: AI質問のクールダウン管理（プレイヤーID -> 最後に押した時刻）
+const aiCooldowns = new Map();
+
+// ★追加2: 共有タイマー管理用
+let timer = {
+    timeLeft: 180, // デフォルト3分
+    isRunning: false,
+    intervalId: null
+};
+
 const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -54,7 +64,6 @@ async function generateWords(difficulty) {
             "Sっ気・Mっ気・攻めと受け・痴女",
             "ギリギリのライン（露出・スリル）",
             "浮気・不倫・修羅場・寝取られ",
-
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
     }
@@ -79,7 +88,7 @@ async function generateWords(difficulty) {
         1. "village" (多数派) と "wolf" (少数派) :
            - **非常に似ている単語**（用途、形、ジャンルがほぼ同じ）。
            - 議論しないと見分けがつかないレベル。（例：うどん vs そば）
-           - **ほぼ意味が同じ単語**は禁止（例：騎乗位と女騎乗位など）。
+           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位**と**女騎乗位**、**おっぱい**と**ぱい**など）。
 
         2. "fox" (第三勢力) :
            - village/wolfとは**「全く違う」単語**。
@@ -93,7 +102,6 @@ async function generateWords(difficulty) {
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty})...`);
-        // ★修正: 2.5 -> 2.0 に戻しました（これで確実に動きます）
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -135,7 +143,6 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        // ★修正: ここも 2.0 に戻しました
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -155,6 +162,9 @@ function calculateVoteResult() {
 }
 
 io.on('connection', (socket) => {
+    // 接続時に現在のタイマー状態を送る
+    socket.emit('timer_update', timer.timeLeft);
+
     socket.on('join_game', (playerName) => {
         const existing = players.find(p => p.name === playerName);
         const newPlayer = { 
@@ -187,6 +197,31 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ★タイマー制御
+    socket.on('timer_control', (action) => {
+        if (action === 'start' && !timer.isRunning) {
+            timer.isRunning = true;
+            timer.intervalId = setInterval(() => {
+                if (timer.timeLeft > 0) {
+                    timer.timeLeft--;
+                    io.emit('timer_update', timer.timeLeft);
+                } else {
+                    clearInterval(timer.intervalId);
+                    timer.isRunning = false;
+                    // 時間切れの音を鳴らすなどの処理が可能
+                }
+            }, 1000);
+        } else if (action === 'stop') {
+            if (timer.intervalId) clearInterval(timer.intervalId);
+            timer.isRunning = false;
+        } else if (action === 'reset') {
+            if (timer.intervalId) clearInterval(timer.intervalId);
+            timer.isRunning = false;
+            timer.timeLeft = 180; // 3分にリセット
+            io.emit('timer_update', timer.timeLeft);
+        }
+    });
+
     socket.on('trigger_sound_effect', (soundType) => {
         io.emit('play_sound_effect', soundType);
     });
@@ -214,6 +249,21 @@ io.on('connection', (socket) => {
         gameState = 'PLAYING';
         votesReceived = 0;
         deadFoxId = null; 
+        
+        // ゲーム開始時にタイマーリセット＆自動スタート
+        if (timer.intervalId) clearInterval(timer.intervalId);
+        timer.timeLeft = 180;
+        timer.isRunning = true;
+        timer.intervalId = setInterval(() => {
+            if (timer.timeLeft > 0) {
+                timer.timeLeft--;
+                io.emit('timer_update', timer.timeLeft);
+            } else {
+                clearInterval(timer.intervalId);
+                timer.isRunning = false;
+            }
+        }, 1000);
+
         players.forEach(p => { 
             p.voteCount = 0; p.status = { question: false, answer: false }; p.voters = []; 
         });
@@ -238,6 +288,16 @@ io.on('connection', (socket) => {
     socket.on('request_ai_questions', async () => {
         const player = players.find(p => p.id === socket.id);
         if (!player) return;
+
+        // ★追加: クールダウンチェック（90秒）
+        const lastTime = aiCooldowns.get(socket.id) || 0;
+        const now = Date.now();
+        if (now - lastTime < 90000) {
+            // 90秒経過していなければ何もしない
+            return;
+        }
+        aiCooldowns.set(socket.id, now);
+
         const questions = await generateAiQuestions(player.word);
         socket.emit('ai_questions_result', questions);
     });
@@ -276,6 +336,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('start_voting', () => {
+        // 投票開始でタイマーストップ
+        if (timer.intervalId) clearInterval(timer.intervalId);
+        timer.isRunning = false;
+
         gameState = 'VOTING_FOX';
         io.emit('show_voting_screen', { players, phase: 'FOX', deadFoxId: null });
     });
@@ -336,6 +400,7 @@ io.on('connection', (socket) => {
 
     socket.on('force_reset', () => {
         players = []; gameState = 'WAITING'; votesReceived = 0; deadFoxId = null;
+        if (timer.intervalId) clearInterval(timer.intervalId);
         io.emit('reset_to_login'); 
     });
 
