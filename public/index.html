@@ -34,7 +34,7 @@
             background: rgba(0,0,0,0.5); border-radius: 10px; padding: 10px; margin-bottom: 15px;
             display: flex; flex-direction: column; align-items: center;
         }
-        #timer-display { font-size: 2.5rem; font-weight: bold; color: #00ff9d; font-family: monospace; }
+        .timer-display-text { font-size: 2.5rem; font-weight: bold; color: #00ff9d; font-family: monospace; }
         .timer-controls { display: flex; gap: 10px; margin-top: 5px; }
         .timer-btn { padding: 5px 15px; font-size: 0.9rem; margin: 0; background: #333; border: 1px solid #555; color: white; }
 
@@ -54,7 +54,6 @@
         .se-nice { border-color: #ffd700; color: #ffd700; }
         .se-sus { border-color: #ff6b6b; color: #ff6b6b; }
 
-        /* 画像演出用 */
         #visual-effect-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3000; pointer-events: none; }
         .pop-image { width: 200px; height: 200px; object-fit: contain; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
@@ -106,6 +105,14 @@
         <button class="copy-btn" onclick="copyUrl()">🔗 URLをコピー</button>
         <ul id="players-ul"></ul>
         <div style="margin-top:20px; border-top:1px solid #444; padding-top:15px;">
+            <!-- ★追加: 人狼人数選択 -->
+            <label>人狼の人数</label>
+            <select id="wolf-count" style="margin-bottom: 15px;">
+                <option value="1" selected>🐺 1人</option>
+                <option value="2">🐺 2人</option>
+                <option value="3">🐺 3人</option>
+            </select>
+            <br>
             <label>お題のジャンル</label>
             <select id="difficulty">
                 <option value="sexy" selected>🔞 セクシー</option>
@@ -124,9 +131,8 @@
             <button class="reroll-btn" onclick="reroll()">🔄 お題リロール</button>
         </div>
         
-        <!-- ★変更：タイマーエリア初期値00:30 -->
         <div class="timer-container">
-            <div id="timer-display">00:30</div>
+            <div id="timer-display" class="timer-display-text">00:30</div>
             <div class="timer-controls">
                 <button class="timer-btn" onclick="socket.emit('timer_control', 'start')">▶</button>
                 <button class="timer-btn" onclick="socket.emit('timer_control', 'stop')">⏸</button>
@@ -146,7 +152,6 @@
             <button class="se-btn se-sus" onclick="emitSound('sus')">🤔 怪しい</button>
         </div>
 
-        <!-- AI質問ボタン (ID付き) -->
         <button id="ai-q-btn" class="ai-hint-btn" onclick="requestAiHint()">💡 質問案をAIに聞く</button>
         <div id="ai-hint-box" class="hidden ai-hint-list"></div>
 
@@ -163,6 +168,11 @@
 
     <!-- 4. 投票画面 -->
     <div id="vote-screen" class="box hidden animate__animated animate__fadeInRight">
+        <div class="timer-container" style="background: rgba(255,0,0,0.2);">
+            <div id="vote-timer-display" class="timer-display-text">00:30</div>
+            <div style="font-size:0.8rem; margin-top:5px;">時間切れ注意！</div>
+        </div>
+
         <h2 id="vote-title">👉 追放投票</h2>
         <p id="vote-desc">怪しい人を選んでください</p>
         <div id="vote-buttons"></div>
@@ -234,11 +244,12 @@
             setTimeout(() => img.remove(), 2000);
         });
 
-        // タイマー受信
         socket.on('timer_update', (seconds) => {
             const min = Math.floor(seconds / 60).toString().padStart(2, '0');
             const sec = (seconds % 60).toString().padStart(2, '0');
-            document.getElementById('timer-display').textContent = `${min}:${sec}`;
+            const timeStr = `${min}:${sec}`;
+            document.getElementById('timer-display').textContent = timeStr;
+            document.getElementById('vote-timer-display').textContent = timeStr;
         });
 
         function showScreen(id) {
@@ -247,7 +258,6 @@
             document.getElementById(id).classList.remove('animate__animated');
             void document.getElementById(id).offsetWidth;
             document.getElementById(id).classList.add('animate__animated');
-            
             if(id === 'game-screen') document.getElementById('reaction-bar')?.classList.remove('hidden');
         }
 
@@ -264,11 +274,16 @@
             socket.emit('join_game', name);
         }
 
-        function startGame() { socket.emit('start_game', document.getElementById('difficulty').value); }
+        // ★変更: start_gameに人数設定も渡す
+        function startGame() { 
+            const diff = document.getElementById('difficulty').value;
+            const wolfCount = document.getElementById('wolf-count').value;
+            socket.emit('start_game', { diff, wolfCount }); 
+        }
+        
         function nextGame() { socket.emit('trigger_next_game'); }
         function reroll() { if(confirm('本当にお題を変えますか？')) socket.emit('reroll_words'); }
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
-        
         function flipCard() { document.getElementById('word-card-inner').classList.toggle('flipped'); }
 
         socket.on('update_players', (players) => {
@@ -476,6 +491,11 @@
                 ul.appendChild(li);
             });
         });
+
+        function voterTags(p){
+            if(!p.voters || p.voters.length === 0) return '';
+            return `<div class="voters-list">投票者: ${p.voters.map(v => `<span class="voter-tag">${v}</span>`).join('')}</div>`;
+        }
 
         socket.on('reset_game', () => { showScreen('lobby-screen'); document.body.className = ''; });
         socket.on('reset_to_login', () => { showScreen('login-screen'); document.getElementById('username').value = ''; document.body.className = ''; });

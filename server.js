@@ -22,10 +22,8 @@ let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
 let currentDifficulty = 'sexy';
 
-// AI質問のクールダウン管理
 const aiCooldowns = new Map();
 
-// ★変更: タイマー初期値を30秒に設定
 let timer = {
     timeLeft: 30, 
     isRunning: false,
@@ -39,7 +37,6 @@ const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
 ];
 
-// シャッフル関数
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -54,7 +51,6 @@ async function generateWords(difficulty) {
 
     let subTheme = "";
     if (difficulty === 'sexy') {
-        // ★変更: ご指定のサブテーマリスト
         const sexySubThemes = [
             "下着・ランジェリー・勝負服",
             "大人の道具・おもちゃ",
@@ -89,7 +85,7 @@ async function generateWords(difficulty) {
         1. "village" (多数派) と "wolf" (少数派) :
            - **非常に似ている単語**（用途、形、ジャンルがほぼ同じ）。
            - 議論しないと見分けがつかないレベル。（例：うどん vs そば）
-           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位****女騎乗位**、**おっぱい**と**ぱい**など）。
+           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位**と**女騎乗位**、**おっぱい**と**ぱい**など）。
 
         2. "fox" (第三勢力) :
            - village/wolfとは**「全く違う」単語**。
@@ -162,6 +158,26 @@ function calculateVoteResult() {
     return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
+function startServerTimer(duration, autoStart = true) {
+    if (timer.intervalId) clearInterval(timer.intervalId);
+    timer.timeLeft = duration;
+    timer.isRunning = autoStart;
+    io.emit('timer_update', timer.timeLeft);
+
+    if (autoStart) {
+        timer.intervalId = setInterval(() => {
+            if (timer.timeLeft > 0) {
+                timer.timeLeft--;
+                io.emit('timer_update', timer.timeLeft);
+            } else {
+                clearInterval(timer.intervalId);
+                timer.isRunning = false;
+                io.emit('play_sound_effect', 'vote'); 
+            }
+        }, 1000);
+    }
+}
+
 io.on('connection', (socket) => {
     socket.emit('timer_update', timer.timeLeft);
 
@@ -216,7 +232,7 @@ io.on('connection', (socket) => {
         } else if (action === 'reset') {
             if (timer.intervalId) clearInterval(timer.intervalId);
             timer.isRunning = false;
-            timer.timeLeft = 30; // ★変更: 30秒にリセット
+            timer.timeLeft = 30; 
             io.emit('timer_update', timer.timeLeft);
         }
     });
@@ -225,6 +241,7 @@ io.on('connection', (socket) => {
         io.emit('play_sound_effect', soundType);
     });
 
+    // リロール時は前回の設定を引き継ぐ
     socket.on('reroll_words', async () => {
         if (gameState !== 'PLAYING') return;
         io.emit('loading_start'); 
@@ -240,7 +257,8 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on('start_game', async (diff) => {
+    // ★変更: 人狼の人数(wolfCount)を受け取る
+    socket.on('start_game', async ({ diff, wolfCount }) => {
         if (players.length < 3) return;
         currentDifficulty = diff;
         io.emit('loading_start');
@@ -249,20 +267,7 @@ io.on('connection', (socket) => {
         votesReceived = 0;
         deadFoxId = null; 
         
-        // ★変更: ゲーム開始時のタイマー設定（30秒）
-        if (timer.intervalId) clearInterval(timer.intervalId);
-        timer.timeLeft = 30;
-        timer.isRunning = true;
-        timer.intervalId = setInterval(() => {
-            if (timer.timeLeft > 0) {
-                timer.timeLeft--;
-                io.emit('timer_update', timer.timeLeft);
-            } else {
-                clearInterval(timer.intervalId);
-                timer.isRunning = false;
-                io.emit('play_sound_effect', 'vote'); // 時間切れ音
-            }
-        }, 1000);
+        startServerTimer(30, false);
 
         players.forEach(p => { 
             p.voteCount = 0; p.status = { question: false, answer: false }; p.voters = []; 
@@ -271,11 +276,35 @@ io.on('connection', (socket) => {
         const words = await generateWords(diff);
         currentWords = words;
 
+        // ★役職割り当てロジックの変更
+        // wolfCountは文字列で来るかもしれないので数値化
+        let numWolves = parseInt(wolfCount) || 1;
+        
+        // 人数チェック：(狼 + 狐1) がプレイヤー数以上にならないようにする
+        // 最低でも村人が1人はいるように調整
+        if (numWolves >= players.length - 1) {
+            numWolves = 1; // 多すぎる場合は1人に強制変更
+        }
+
         const shuffled = shuffleArray([...players]);
+        
         shuffled.forEach((p, i) => {
-            if (i === 0) { p.role = 'wolf'; p.word = words.wolf; }
-            else if (i === 1) { p.role = 'fox'; p.word = words.fox; }
-            else { p.role = 'villager'; p.word = words.village; }
+            // 0番目から numWolves人分を狼にする
+            if (i < numWolves) {
+                p.role = 'wolf';
+                p.word = words.wolf;
+            } 
+            // その次の1人を狐にする
+            else if (i === numWolves) {
+                p.role = 'fox';
+                p.word = words.fox;
+            } 
+            // 残りは村人
+            else {
+                p.role = 'villager';
+                p.word = words.village;
+            }
+            
             if (!p.word) p.word = "エラー";
             io.to(p.id).emit('game_started', { word: p.word, difficulty: diff });
         });
@@ -290,9 +319,7 @@ io.on('connection', (socket) => {
 
         const lastTime = aiCooldowns.get(socket.id) || 0;
         const now = Date.now();
-        if (now - lastTime < 90000) {
-            return;
-        }
+        if (now - lastTime < 90000) return;
         aiCooldowns.set(socket.id, now);
 
         const questions = await generateAiQuestions(player.word);
@@ -367,6 +394,7 @@ io.on('connection', (socket) => {
                         votesReceived = 0;
                         players.forEach(p => { p.voteCount = 0; p.voters = []; });
                         io.emit('show_voting_screen', { players, phase: 'WOLF', deadFoxId: deadFoxId });
+                        startServerTimer(30, true); 
                     }, 4000); 
                 } else {
                     gameState = 'RESULT';
@@ -387,6 +415,7 @@ io.on('connection', (socket) => {
     socket.on('trigger_next_game', () => {
         gameState = 'WAITING';
         votesReceived = 0; deadFoxId = null;
+        if (timer.intervalId) clearInterval(timer.intervalId);
         players.forEach(p => { 
             p.role=''; p.word=''; p.voteCount=0; p.voters=[]; p.status = { question: false, answer: false }; 
         });
