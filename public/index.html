@@ -124,7 +124,7 @@
             <button class="reroll-btn" onclick="reroll()">🔄 お題リロール</button>
         </div>
         
-        <!-- ★タイマーエリア -->
+        <!-- ★変更：タイマーエリア初期値00:30 -->
         <div class="timer-container">
             <div id="timer-display">00:30</div>
             <div class="timer-controls">
@@ -146,7 +146,7 @@
             <button class="se-btn se-sus" onclick="emitSound('sus')">🤔 怪しい</button>
         </div>
 
-        <!-- ★AI質問ボタン (ID付き) -->
+        <!-- AI質問ボタン (ID付き) -->
         <button id="ai-q-btn" class="ai-hint-btn" onclick="requestAiHint()">💡 質問案をAIに聞く</button>
         <div id="ai-hint-box" class="hidden ai-hint-list"></div>
 
@@ -170,8 +170,8 @@
     
     <!-- 狐逆転チャレンジ画面 -->
     <div id="fox-challenge-overlay" class="hidden animate__animated animate__fadeIn">
-        <h2 style="color:#feca57; text-align:center;">🔥 大逆転チャレンジ！🔥</h2>
-        <p style="color:white;">村と狼、2つのワードを当てて逆転勝利を掴め！</p>
+        <h2 style="color:#feca57; text-align:center;">🦊 大逆転チャレンジ！</h2>
+        <p style="color:white;">村と狼、2つのワードを当てろ！</p>
         <div id="fox-timer-display">60</div>
         <input type="text" id="fox-input-v" placeholder="村のワードを予想">
         <input type="text" id="fox-input-w" placeholder="狼のワードを予想">
@@ -216,7 +216,6 @@
         function emitSound(type) { socket.emit('trigger_sound_effect', type); }
         
         socket.on('play_sound_effect', (type) => {
-            // 画像演出
             const container = document.getElementById('visual-effect-container');
             const img = document.createElement('img');
             img.className = 'pop-image';
@@ -227,7 +226,7 @@
                 playSound('sus.mp3');
                 img.src = '/images/sus.png';
             } else if(type === 'vote') {
-                playSound('vote.mp3'); // タイムアップ時など
+                playSound('vote.mp3'); 
                 return;
             }
             container.innerHTML = ''; 
@@ -235,7 +234,7 @@
             setTimeout(() => img.remove(), 2000);
         });
 
-        // ★タイマー受信
+        // タイマー受信
         socket.on('timer_update', (seconds) => {
             const min = Math.floor(seconds / 60).toString().padStart(2, '0');
             const sec = (seconds % 60).toString().padStart(2, '0');
@@ -248,6 +247,8 @@
             document.getElementById(id).classList.remove('animate__animated');
             void document.getElementById(id).offsetWidth;
             document.getElementById(id).classList.add('animate__animated');
+            
+            if(id === 'game-screen') document.getElementById('reaction-bar')?.classList.remove('hidden');
         }
 
         function changeBackground(difficulty) {
@@ -311,7 +312,6 @@
 
         function toggleStatus(targetId, type) { socket.emit('toggle_action', { targetId, type }); }
         
-        // ★AI質問ボタン（クールダウン実装）
         function requestAiHint() {
             const btn = document.getElementById('ai-q-btn');
             btn.disabled = true;
@@ -476,11 +476,6 @@
                 ul.appendChild(li);
             });
         });
-
-        function voterTags(p){
-            if(!p.voters || p.voters.length === 0) return '';
-            return `<div class="voters-list">投票者: ${p.voters.map(v => `<span class="voter-tag">${v}</span>`).join('')}</div>`;
-        }
 
         socket.on('reset_game', () => { showScreen('lobby-screen'); document.body.className = ''; });
         socket.on('reset_to_login', () => { showScreen('login-screen'); document.getElementById('username').value = ''; document.body.className = ''; });

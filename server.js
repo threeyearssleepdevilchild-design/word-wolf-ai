@@ -22,12 +22,12 @@ let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
 let currentDifficulty = 'sexy';
 
-// ★追加1: AI質問のクールダウン管理（プレイヤーID -> 最後に押した時刻）
+// AI質問のクールダウン管理
 const aiCooldowns = new Map();
 
-// ★追加2: 共有タイマー管理用
+// ★変更: タイマー初期値を30秒に設定
 let timer = {
-    timeLeft: 180, // デフォルト3分
+    timeLeft: 30, 
     isRunning: false,
     intervalId: null
 };
@@ -54,6 +54,7 @@ async function generateWords(difficulty) {
 
     let subTheme = "";
     if (difficulty === 'sexy') {
+        // ★変更: ご指定のサブテーマリスト
         const sexySubThemes = [
             "下着・ランジェリー・勝負服",
             "大人の道具・おもちゃ",
@@ -63,7 +64,7 @@ async function generateWords(difficulty) {
             "コスプレ・ロールプレイ",
             "Sっ気・Mっ気・攻めと受け・痴女",
             "ギリギリのライン（露出・スリル）",
-            "浮気・不倫・修羅場・寝取られ",
+            "浮気・不倫・修羅場・寝取られ"
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
     }
@@ -88,7 +89,7 @@ async function generateWords(difficulty) {
         1. "village" (多数派) と "wolf" (少数派) :
            - **非常に似ている単語**（用途、形、ジャンルがほぼ同じ）。
            - 議論しないと見分けがつかないレベル。（例：うどん vs そば）
-           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位**と**女騎乗位**、**おっぱい**と**ぱい**など）。
+           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位****女騎乗位**、**おっぱい**と**ぱい**など）。
 
         2. "fox" (第三勢力) :
            - village/wolfとは**「全く違う」単語**。
@@ -139,7 +140,7 @@ async function generateWords(difficulty) {
 async function generateAiQuestions(word) {
     if (!apiKey) return ["質問案1", "質問案2", "質問案3"];
     const prompt = `
-        ワードウルフ「${word}」について、バレないような当たり障りのない質問を3つ考えて。
+        ワードウルフ「${word}」について、バレないような当たり障りのない簡潔な質問を3つ考えて箇条書きにして。
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
@@ -162,7 +163,6 @@ function calculateVoteResult() {
 }
 
 io.on('connection', (socket) => {
-    // 接続時に現在のタイマー状態を送る
     socket.emit('timer_update', timer.timeLeft);
 
     socket.on('join_game', (playerName) => {
@@ -197,7 +197,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ★タイマー制御
     socket.on('timer_control', (action) => {
         if (action === 'start' && !timer.isRunning) {
             timer.isRunning = true;
@@ -208,7 +207,7 @@ io.on('connection', (socket) => {
                 } else {
                     clearInterval(timer.intervalId);
                     timer.isRunning = false;
-                    // 時間切れの音を鳴らすなどの処理が可能
+                    io.emit('play_sound_effect', 'vote'); 
                 }
             }, 1000);
         } else if (action === 'stop') {
@@ -217,7 +216,7 @@ io.on('connection', (socket) => {
         } else if (action === 'reset') {
             if (timer.intervalId) clearInterval(timer.intervalId);
             timer.isRunning = false;
-            timer.timeLeft = 180; // 3分にリセット
+            timer.timeLeft = 30; // ★変更: 30秒にリセット
             io.emit('timer_update', timer.timeLeft);
         }
     });
@@ -250,9 +249,9 @@ io.on('connection', (socket) => {
         votesReceived = 0;
         deadFoxId = null; 
         
-        // ゲーム開始時にタイマーリセット＆自動スタート
+        // ★変更: ゲーム開始時のタイマー設定（30秒）
         if (timer.intervalId) clearInterval(timer.intervalId);
-        timer.timeLeft = 180;
+        timer.timeLeft = 30;
         timer.isRunning = true;
         timer.intervalId = setInterval(() => {
             if (timer.timeLeft > 0) {
@@ -261,6 +260,7 @@ io.on('connection', (socket) => {
             } else {
                 clearInterval(timer.intervalId);
                 timer.isRunning = false;
+                io.emit('play_sound_effect', 'vote'); // 時間切れ音
             }
         }, 1000);
 
@@ -272,7 +272,6 @@ io.on('connection', (socket) => {
         currentWords = words;
 
         const shuffled = shuffleArray([...players]);
-        
         shuffled.forEach((p, i) => {
             if (i === 0) { p.role = 'wolf'; p.word = words.wolf; }
             else if (i === 1) { p.role = 'fox'; p.word = words.fox; }
@@ -289,11 +288,9 @@ io.on('connection', (socket) => {
         const player = players.find(p => p.id === socket.id);
         if (!player) return;
 
-        // ★追加: クールダウンチェック（90秒）
         const lastTime = aiCooldowns.get(socket.id) || 0;
         const now = Date.now();
         if (now - lastTime < 90000) {
-            // 90秒経過していなければ何もしない
             return;
         }
         aiCooldowns.set(socket.id, now);
@@ -336,7 +333,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('start_voting', () => {
-        // 投票開始でタイマーストップ
         if (timer.intervalId) clearInterval(timer.intervalId);
         timer.isRunning = false;
 
