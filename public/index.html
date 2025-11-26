@@ -29,7 +29,6 @@
         .gacha-q { background: linear-gradient(45deg, #ff9a9e, #fecfef); }
         .gacha-a { background: linear-gradient(45deg, #a18cd1, #fbc2eb); }
         
-        /* タイマー */
         .timer-container {
             background: rgba(0,0,0,0.5); border-radius: 10px; padding: 10px; margin-bottom: 15px;
             display: flex; flex-direction: column; align-items: center;
@@ -61,7 +60,21 @@
         #fox-challenge-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44, 11, 14, 0.98); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         #fox-input-v, #fox-input-w { background: #5a1e23; border: 1px solid #ff6b6b; color: white; width: 80%; font-size: 1.1rem; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
         #fox-timer-display { font-size: 3rem; color: #ff6b6b; font-weight: bold; margin: 20px; }
+        
+        /* ★追加: 一斉回答用オーバーレイ */
+        #simultaneous-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(26, 26, 46, 0.98); z-index: 2500;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
+        }
+        #simul-input { width: 80%; font-size: 1.2rem; margin: 20px 0; padding: 10px; }
+        .simul-list { width: 100%; max-width: 500px; max-height: 70vh; overflow-y: auto; list-style: none; padding: 0; }
+        .simul-item { background: rgba(255,255,255,0.1); margin: 10px; padding: 15px; border-radius: 8px; text-align: left; }
+        .simul-name { color: #e94560; font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; }
+        .simul-text { font-size: 1.2rem; font-weight: bold; color: #fff; }
+
         .role-wolf { color: #ff6b6b; font-weight: bold; } .role-fox { color: #feca57; font-weight: bold; } .role-villager { color: #1dd1a1; font-weight: bold; }
+        .voter-names { font-size: 0.75rem; color: #aaa; display: block; text-align: right; margin-top: 3px; }
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
         .spinner { width: 50px; height: 50px; border: 5px solid rgba(233, 69, 96, 0.3); border-top: 5px solid #e94560; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -88,8 +101,23 @@
         <p>AIが思考中...<br>🧠💭</p>
     </div>
 
-    <!-- 画像演出用コンテナ -->
     <div id="visual-effect-container"></div>
+
+    <!-- 一斉回答用オーバーレイ -->
+    <div id="simultaneous-overlay" class="hidden animate__animated animate__fadeInUp">
+        <div id="simul-input-area" style="text-align:center; width:100%;">
+            <h2 style="color:#4CAF50;">⚡ 一斉回答チャンス！ ⚡</h2>
+            <p>全員の回答が出揃うまで公開されません</p>
+            <input type="text" id="simul-input" placeholder="回答を入力...">
+            <button onclick="submitSimulAnswer()" style="background:#4CAF50; font-size:1.2rem; padding:15px; width:80%;">送信</button>
+            <p id="simul-status" style="margin-top:20px; color:#aaa;">待機中...</p>
+        </div>
+        <div id="simul-result-area" class="hidden" style="text-align:center; width:100%;">
+            <h2>📝 全員の回答</h2>
+            <ul id="simul-result-list" class="simul-list"></ul>
+            <button onclick="closeSimul()" style="background:#999; margin-top:20px;">閉じる</button>
+        </div>
+    </div>
 
     <!-- 1. 名前入力 -->
     <div id="login-screen" class="box animate__animated animate__fadeInUp">
@@ -105,7 +133,6 @@
         <button class="copy-btn" onclick="copyUrl()">🔗 URLをコピー</button>
         <ul id="players-ul"></ul>
         <div style="margin-top:20px; border-top:1px solid #444; padding-top:15px;">
-            <!-- 人狼人数選択 -->
             <label>人狼の人数</label>
             <select id="wolf-count" style="margin-bottom: 15px;">
                 <option value="1" selected>🐺 1人</option>
@@ -131,9 +158,8 @@
             <button class="reroll-btn" onclick="reroll()">🔄 お題リロール</button>
         </div>
         
-        <!-- 議論用タイマー -->
         <div class="timer-container">
-            <div id="discussion-timer-display" class="timer-display-text">00:30</div>
+            <div id="timer-display" class="timer-display-text">00:30</div>
             <div class="timer-controls">
                 <button class="timer-btn" onclick="socket.emit('timer_control', 'start')">▶</button>
                 <button class="timer-btn" onclick="socket.emit('timer_control', 'stop')">⏸</button>
@@ -169,7 +195,6 @@
 
     <!-- 4. 投票画面 -->
     <div id="vote-screen" class="box hidden animate__animated animate__fadeInRight">
-        <!-- 投票用タイマー -->
         <div class="timer-container" style="background: rgba(255,0,0,0.2);">
             <div id="vote-timer-display" class="timer-display-text">00:30</div>
             <div style="font-size:0.8rem; margin-top:5px;">時間切れ注意！</div>
@@ -246,19 +271,12 @@
             setTimeout(() => img.remove(), 2000);
         });
 
-        // ★変更: 2つのタイマーイベントを受信して振り分け
-        function formatTime(seconds) {
+        socket.on('timer_update', (seconds) => {
             const min = Math.floor(seconds / 60).toString().padStart(2, '0');
             const sec = (seconds % 60).toString().padStart(2, '0');
-            return `${min}:${sec}`;
-        }
-
-        socket.on('discussion_timer_update', (seconds) => {
-            document.getElementById('discussion-timer-display').textContent = formatTime(seconds);
-        });
-
-        socket.on('voting_timer_update', (seconds) => {
-            document.getElementById('vote-timer-display').textContent = formatTime(seconds);
+            const timeStr = `${min}:${sec}`;
+            document.getElementById('timer-display').textContent = timeStr;
+            document.getElementById('vote-timer-display').textContent = timeStr;
         });
 
         function showScreen(id) {
@@ -291,7 +309,6 @@
         function nextGame() { socket.emit('trigger_next_game'); }
         function reroll() { if(confirm('本当にお題を変えますか？')) socket.emit('reroll_words'); }
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
-        
         function flipCard() { document.getElementById('word-card-inner').classList.toggle('flipped'); }
 
         socket.on('update_players', (players) => {
@@ -328,10 +345,50 @@
             });
         });
 
+        // 指名ガチャの結果
         socket.on('random_pick_result', (data) => {
             let title = data.type === 'question' ? "🎲 次の【質問者】" : "🎲 次の【回答者】";
             alert(`${title}は...\n\n👉 【 ${data.name} 】さん\n\nお願いします！`);
         });
+
+        // ★追加: 一斉回答イベント
+        socket.on('start_simultaneous_mode', () => {
+            // 画面を表示
+            document.getElementById('simultaneous-overlay').classList.remove('hidden');
+            document.getElementById('simul-input-area').classList.remove('hidden');
+            document.getElementById('simul-result-area').classList.add('hidden');
+            document.getElementById('simul-input').value = '';
+            document.getElementById('simul-status').textContent = '待機中...';
+        });
+
+        function submitSimulAnswer() {
+            const text = document.getElementById('simul-input').value;
+            if(!text) return alert('回答を入力してください');
+            socket.emit('submit_simultaneous_answer', text);
+            document.getElementById('simul-input').value = '';
+            document.getElementById('simul-status').textContent = '送信完了！全員揃うまでお待ちください...';
+        }
+
+        socket.on('update_simultaneous_progress', (current, total) => {
+            document.getElementById('simul-status').textContent = `回答受付中... (${current} / ${total} 人)`;
+        });
+
+        socket.on('reveal_simultaneous_answers', (results) => {
+            document.getElementById('simul-input-area').classList.add('hidden');
+            document.getElementById('simul-result-area').classList.remove('hidden');
+            const ul = document.getElementById('simul-result-list');
+            ul.innerHTML = '';
+            results.forEach(res => {
+                const li = document.createElement('li');
+                li.className = 'simul-item';
+                li.innerHTML = `<div class="simul-name">${res.name}</div><div class="simul-text">${res.text}</div>`;
+                ul.appendChild(li);
+            });
+        });
+
+        function closeSimul() {
+            document.getElementById('simultaneous-overlay').classList.add('hidden');
+        }
 
         function toggleStatus(targetId, type) { socket.emit('toggle_action', { targetId, type }); }
         
@@ -451,6 +508,7 @@
             playSound('result.mp3');
             clearInterval(foxTimerInterval);
             document.getElementById('fox-challenge-overlay').classList.add('hidden'); 
+            document.getElementById('simultaneous-overlay').classList.add('hidden'); // 一斉回答も閉じる
             showScreen('result-screen');
             
             const ul = document.getElementById('result-list');

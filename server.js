@@ -22,17 +22,13 @@ let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
 let currentDifficulty = 'sexy';
 
+// ★追加: 一斉回答の管理用
+let simultaneousAnswers = []; // [{name: "Aさん", answer: "回答"}, ...]
+
 const aiCooldowns = new Map();
 
-// ★変更: タイマーを2つに分離
-let discussionTimer = {
-    timeLeft: 30,
-    isRunning: false,
-    intervalId: null
-};
-
-let votingTimer = {
-    timeLeft: 30,
+let timer = {
+    timeLeft: 30, 
     isRunning: false,
     intervalId: null
 };
@@ -82,17 +78,24 @@ async function generateWords(difficulty) {
     const prompt = `
         ワードウルフのお題を作成。
         ターゲット: ${diffText}, テーマ: ${themeText}
-        禁止ワード: [ ${bannedWords} ]
+        
+        【重要：禁止ワード】
+        以下の単語は過去に使用したため、今回は**絶対に使用しないでください**:
+        [ ${bannedWords} ]
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **非常に似ている単語**。議論しないと見分けがつかないレベル。
-           - **ほぼ意味が同じ単語**は禁止（例：騎乗位と女騎乗位など）。
+           - **非常に似ている単語**（用途、形、ジャンルがほぼ同じ）。
+           - 議論しないと見分けがつかないレベル。（例：うどん vs そば）
+           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位**と**女騎乗位**、**おっぱい**と**ぱい**など）。
+
         2. "fox" (第三勢力) :
            - village/wolfとは**「全く違う」単語**。
            - ただし、会話に参加できる程度の共通点は持たせること。
+           - カテゴリーや質感が決定的に違うもの。
         
-        【出力形式】JSON形式のみ。
+        【出力形式】
+        JSON形式のみ出力(マークダウン禁止)。
         { "village":"...", "wolf":"...", "fox":"...", "reason":"簡単な解説" }
     `;
 
@@ -123,7 +126,10 @@ async function generateWords(difficulty) {
         if (!v || !w || !f) return fallback;
 
         usedWordsHistory.push(v, w, f);
-        if (usedWordsHistory.length > 150) usedWordsHistory = usedWordsHistory.slice(-150);
+        if (usedWordsHistory.length > 150) {
+            usedWordsHistory = usedWordsHistory.slice(-150);
+        }
+
         return { village: v, wolf: w, fox: f, reason: r };
 
     } catch (e) { console.error(e); return fallback; }
@@ -132,7 +138,7 @@ async function generateWords(difficulty) {
 async function generateAiQuestions(word) {
     if (!apiKey) return ["質問案1", "質問案2", "質問案3"];
     const prompt = `
-        ワードウルフ「${word}」について、バレないような当たり障りのない簡潔な質問を3つ考えて。
+        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を3つ考えて。
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
@@ -154,29 +160,28 @@ function calculateVoteResult() {
     return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
-// ★追加: 投票用タイマー開始関数
-function startVotingTimer() {
-    if (votingTimer.intervalId) clearInterval(votingTimer.intervalId);
-    votingTimer.timeLeft = 30;
-    votingTimer.isRunning = true;
-    io.emit('voting_timer_update', votingTimer.timeLeft); // 即時反映
+function startServerTimer(duration, autoStart = true) {
+    if (timer.intervalId) clearInterval(timer.intervalId);
+    timer.timeLeft = duration;
+    timer.isRunning = autoStart;
+    io.emit('timer_update', timer.timeLeft);
 
-    votingTimer.intervalId = setInterval(() => {
-        if (votingTimer.timeLeft > 0) {
-            votingTimer.timeLeft--;
-            io.emit('voting_timer_update', votingTimer.timeLeft);
-        } else {
-            clearInterval(votingTimer.intervalId);
-            votingTimer.isRunning = false;
-            io.emit('play_sound_effect', 'vote'); // タイムアップ音
-        }
-    }, 1000);
+    if (autoStart) {
+        timer.intervalId = setInterval(() => {
+            if (timer.timeLeft > 0) {
+                timer.timeLeft--;
+                io.emit('timer_update', timer.timeLeft);
+            } else {
+                clearInterval(timer.intervalId);
+                timer.isRunning = false;
+                io.emit('play_sound_effect', 'vote'); 
+            }
+        }, 1000);
+    }
 }
 
 io.on('connection', (socket) => {
-    // 接続時に両方のタイマー状態を送る
-    socket.emit('discussion_timer_update', discussionTimer.timeLeft);
-    socket.emit('voting_timer_update', votingTimer.timeLeft);
+    socket.emit('timer_update', timer.timeLeft);
 
     socket.on('join_game', (playerName) => {
         const existing = players.find(p => p.name === playerName);
@@ -199,7 +204,6 @@ io.on('connection', (socket) => {
                     socket.emit('show_voting_screen', { players, phase: gameState, deadFoxId });
                 }
                 if(gameState === 'RESULT') socket.emit('game_result', { players, winner: 'unknown', reason: currentWords.reason });
-                
                 if(existing.id === deadFoxId && gameState === 'VOTING_WOLF') {
                     socket.emit('start_fox_challenge');
                 }
@@ -210,28 +214,27 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ★変更: 議論タイマーの制御（投票タイマーには干渉しない）
     socket.on('timer_control', (action) => {
-        if (action === 'start' && !discussionTimer.isRunning) {
-            discussionTimer.isRunning = true;
-            discussionTimer.intervalId = setInterval(() => {
-                if (discussionTimer.timeLeft > 0) {
-                    discussionTimer.timeLeft--;
-                    io.emit('discussion_timer_update', discussionTimer.timeLeft);
+        if (action === 'start' && !timer.isRunning) {
+            timer.isRunning = true;
+            timer.intervalId = setInterval(() => {
+                if (timer.timeLeft > 0) {
+                    timer.timeLeft--;
+                    io.emit('timer_update', timer.timeLeft);
                 } else {
-                    clearInterval(discussionTimer.intervalId);
-                    discussionTimer.isRunning = false;
+                    clearInterval(timer.intervalId);
+                    timer.isRunning = false;
                     io.emit('play_sound_effect', 'vote'); 
                 }
             }, 1000);
         } else if (action === 'stop') {
-            if (discussionTimer.intervalId) clearInterval(discussionTimer.intervalId);
-            discussionTimer.isRunning = false;
+            if (timer.intervalId) clearInterval(timer.intervalId);
+            timer.isRunning = false;
         } else if (action === 'reset') {
-            if (discussionTimer.intervalId) clearInterval(discussionTimer.intervalId);
-            discussionTimer.isRunning = false;
-            discussionTimer.timeLeft = 30; // 30秒にリセット
-            io.emit('discussion_timer_update', discussionTimer.timeLeft);
+            if (timer.intervalId) clearInterval(timer.intervalId);
+            timer.isRunning = false;
+            timer.timeLeft = 30; 
+            io.emit('timer_update', timer.timeLeft);
         }
     });
 
@@ -242,10 +245,8 @@ io.on('connection', (socket) => {
     socket.on('reroll_words', async () => {
         if (gameState !== 'PLAYING') return;
         io.emit('loading_start'); 
-        
         const words = await generateWords(currentDifficulty);
         currentWords = words;
-
         players.forEach(p => {
             if (p.role === 'wolf') p.word = words.wolf;
             else if (p.role === 'fox') p.word = words.fox;
@@ -261,18 +262,10 @@ io.on('connection', (socket) => {
 
         gameState = 'PLAYING';
         votesReceived = 0;
-        deadFoxId = null; 
+        deadFoxId = null;
+        simultaneousAnswers = []; // リセット
         
-        // 議論タイマーのリセット（自動スタートしない）
-        if (discussionTimer.intervalId) clearInterval(discussionTimer.intervalId);
-        discussionTimer.timeLeft = 30;
-        discussionTimer.isRunning = false;
-        io.emit('discussion_timer_update', 30);
-
-        // 投票タイマーのリセット
-        if (votingTimer.intervalId) clearInterval(votingTimer.intervalId);
-        votingTimer.timeLeft = 30;
-        io.emit('voting_timer_update', 30);
+        startServerTimer(30, false);
 
         players.forEach(p => { 
             p.voteCount = 0; p.status = { question: false, answer: false }; p.voters = []; 
@@ -331,24 +324,63 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ★変更: 一斉回答の抽選機能
     socket.on('trigger_random_pick', ({ type }) => {
         if (players.length === 0) return;
+        
         let candidates = [];
-        if (type === 'question') candidates = players.filter(p => !p.status.question);
-        else if (type === 'answer') candidates = players.filter(p => !p.status.answer);
-        if (candidates.length === 0) candidates = players;
-        const randomPlayer = candidates[Math.floor(Math.random() * candidates.length)];
-        io.emit('random_pick_result', { name: randomPlayer.name, type: type });
+        if (type === 'question') {
+            candidates = players.filter(p => !p.status.question);
+        } else if (type === 'answer') {
+            candidates = players.filter(p => !p.status.answer);
+        }
+        if (candidates.length === 0) candidates = [...players]; // 全員済んでたら全員対象
+
+        // 回答者指名の時だけ「一斉回答」を候補に混ぜる
+        if (type === 'answer') {
+            // 候補者リスト + 一斉回答(special ID)
+            const options = [...candidates, { id: 'ALL_SIMULTANEOUS', name: '一斉回答' }];
+            const result = options[Math.floor(Math.random() * options.length)];
+            
+            if (result.id === 'ALL_SIMULTANEOUS') {
+                // 一斉回答モード発動
+                simultaneousAnswers = []; // リセット
+                io.emit('start_simultaneous_mode');
+            } else {
+                io.emit('random_pick_result', { name: result.name, type: type });
+            }
+        } else {
+            // 質問者指名は通常通り
+            const randomPlayer = candidates[Math.floor(Math.random() * candidates.length)];
+            io.emit('random_pick_result', { name: randomPlayer.name, type: type });
+        }
+    });
+
+    // ★追加: 一斉回答の受信と開示
+    socket.on('submit_simultaneous_answer', (answerText) => {
+        const player = players.find(p => p.id === socket.id);
+        if (!player) return;
+
+        // 既に提出済みなら更新、なければ追加
+        const existing = simultaneousAnswers.find(a => a.id === socket.id);
+        if (existing) {
+            existing.text = answerText;
+        } else {
+            simultaneousAnswers.push({ id: socket.id, name: player.name, text: answerText });
+        }
+
+        // 提出状況を通知（中身は見せない）
+        io.emit('update_simultaneous_progress', simultaneousAnswers.length, players.length);
+
+        // 全員提出したら開示
+        if (simultaneousAnswers.length >= players.length) {
+            io.emit('reveal_simultaneous_answers', simultaneousAnswers);
+        }
     });
 
     socket.on('start_voting', () => {
-        // 議論タイマーは止める
-        if (discussionTimer.intervalId) clearInterval(discussionTimer.intervalId);
-        discussionTimer.isRunning = false;
-
-        // ★変更: 投票タイマーをサーバーで自動スタート
-        startVotingTimer();
-
+        if (timer.intervalId) clearInterval(timer.intervalId);
+        timer.isRunning = false;
         gameState = 'VOTING_FOX';
         io.emit('show_voting_screen', { players, phase: 'FOX', deadFoxId: null });
     });
@@ -379,11 +411,8 @@ io.on('connection', (socket) => {
                         gameState = 'VOTING_WOLF';
                         votesReceived = 0;
                         players.forEach(p => { p.voteCount = 0; p.voters = []; });
-                        
-                        // ★変更: 狼投票時もタイマーをリセットして再スタート
-                        startVotingTimer();
-                        
                         io.emit('show_voting_screen', { players, phase: 'WOLF', deadFoxId: deadFoxId });
+                        startServerTimer(30, true); 
                     }, 4000); 
                 } else {
                     gameState = 'RESULT';
@@ -404,10 +433,8 @@ io.on('connection', (socket) => {
     socket.on('trigger_next_game', () => {
         gameState = 'WAITING';
         votesReceived = 0; deadFoxId = null;
-        // 全タイマー停止
-        if (discussionTimer.intervalId) clearInterval(discussionTimer.intervalId);
-        if (votingTimer.intervalId) clearInterval(votingTimer.intervalId);
-        
+        simultaneousAnswers = [];
+        if (timer.intervalId) clearInterval(timer.intervalId);
         players.forEach(p => { 
             p.role=''; p.word=''; p.voteCount=0; p.voters=[]; p.status = { question: false, answer: false }; 
         });
@@ -417,8 +444,7 @@ io.on('connection', (socket) => {
 
     socket.on('force_reset', () => {
         players = []; gameState = 'WAITING'; votesReceived = 0; deadFoxId = null;
-        if (discussionTimer.intervalId) clearInterval(discussionTimer.intervalId);
-        if (votingTimer.intervalId) clearInterval(votingTimer.intervalId);
+        if (timer.intervalId) clearInterval(timer.intervalId);
         io.emit('reset_to_login'); 
     });
 
