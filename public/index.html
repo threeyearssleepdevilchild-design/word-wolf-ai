@@ -105,7 +105,7 @@
         <button class="copy-btn" onclick="copyUrl()">🔗 URLをコピー</button>
         <ul id="players-ul"></ul>
         <div style="margin-top:20px; border-top:1px solid #444; padding-top:15px;">
-            <!-- ★追加: 人狼人数選択 -->
+            <!-- 人狼人数選択 -->
             <label>人狼の人数</label>
             <select id="wolf-count" style="margin-bottom: 15px;">
                 <option value="1" selected>🐺 1人</option>
@@ -131,8 +131,9 @@
             <button class="reroll-btn" onclick="reroll()">🔄 お題リロール</button>
         </div>
         
+        <!-- 議論用タイマー -->
         <div class="timer-container">
-            <div id="timer-display" class="timer-display-text">00:30</div>
+            <div id="discussion-timer-display" class="timer-display-text">00:30</div>
             <div class="timer-controls">
                 <button class="timer-btn" onclick="socket.emit('timer_control', 'start')">▶</button>
                 <button class="timer-btn" onclick="socket.emit('timer_control', 'stop')">⏸</button>
@@ -168,6 +169,7 @@
 
     <!-- 4. 投票画面 -->
     <div id="vote-screen" class="box hidden animate__animated animate__fadeInRight">
+        <!-- 投票用タイマー -->
         <div class="timer-container" style="background: rgba(255,0,0,0.2);">
             <div id="vote-timer-display" class="timer-display-text">00:30</div>
             <div style="font-size:0.8rem; margin-top:5px;">時間切れ注意！</div>
@@ -244,12 +246,19 @@
             setTimeout(() => img.remove(), 2000);
         });
 
-        socket.on('timer_update', (seconds) => {
+        // ★変更: 2つのタイマーイベントを受信して振り分け
+        function formatTime(seconds) {
             const min = Math.floor(seconds / 60).toString().padStart(2, '0');
             const sec = (seconds % 60).toString().padStart(2, '0');
-            const timeStr = `${min}:${sec}`;
-            document.getElementById('timer-display').textContent = timeStr;
-            document.getElementById('vote-timer-display').textContent = timeStr;
+            return `${min}:${sec}`;
+        }
+
+        socket.on('discussion_timer_update', (seconds) => {
+            document.getElementById('discussion-timer-display').textContent = formatTime(seconds);
+        });
+
+        socket.on('voting_timer_update', (seconds) => {
+            document.getElementById('vote-timer-display').textContent = formatTime(seconds);
         });
 
         function showScreen(id) {
@@ -274,16 +283,15 @@
             socket.emit('join_game', name);
         }
 
-        // ★変更: start_gameに人数設定も渡す
         function startGame() { 
             const diff = document.getElementById('difficulty').value;
             const wolfCount = document.getElementById('wolf-count').value;
             socket.emit('start_game', { diff, wolfCount }); 
         }
-        
         function nextGame() { socket.emit('trigger_next_game'); }
         function reroll() { if(confirm('本当にお題を変えますか？')) socket.emit('reroll_words'); }
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
+        
         function flipCard() { document.getElementById('word-card-inner').classList.toggle('flipped'); }
 
         socket.on('update_players', (players) => {
