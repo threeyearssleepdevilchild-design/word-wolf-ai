@@ -22,9 +22,6 @@ let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
 let currentDifficulty = 'sexy';
 
-// ★追加: 一斉回答の管理用
-let simultaneousAnswers = []; // [{name: "Aさん", answer: "回答"}, ...]
-
 const aiCooldowns = new Map();
 
 let timer = {
@@ -33,6 +30,7 @@ let timer = {
     intervalId: null
 };
 
+// 制限全解除
 const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -53,49 +51,77 @@ async function generateWords(difficulty) {
     if (!apiKey) return fallback;
 
     let subTheme = "";
+    let difficultyPrompt = "";
+    let examples = "";
+
     if (difficulty === 'sexy') {
+        // ★修正: より過激・具体的なサブテーマ
         const sexySubThemes = [
-            "下着・ランジェリー",
-            "大人の道具・おもちゃ",
-            "夜のテクニック・体位",
-            "身体の部位（胸・尻など）・フェチ（匂いなど）",
-            "S・M・痴女",
-            "ギリギリのライン（露出・スリル）",
-            "浮気・不倫・修羅場・寝取られ"
+            "挿入する道具（バイブ・ディルド・張形）",
+            "責める道具（ローター・電マ・クリップ）",
+            "SM・拘束・責め苦（鞭・蝋燭・手錠）",
+            "具体的な体位・プレイ（騎乗位・バック・対面座位）",
+            "口や舌を使う行為（フェラ・クンニ・69）",
+            "汁・分泌液（精液・潮・愛液・唾液）",
+            "フェチ・部位（足コキ・パイズリ・脇・匂い・尻）",
+            "NTR・不倫・寝取られ・竿姉妹",
+            "排泄・スカトロ・浣腸・放尿",
+            "露出・痴漢・のぞき・ハプニング"
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
+        
+        difficultyPrompt = `
+            ターゲット: R-18 (成人向け)。
+            サブテーマ: 【${subTheme}】
+            条件: 恥ずかしがらず、具体的で露骨な単語を選ぶこと。
+        `;
+    } else {
+        let diffText = "一般向け";
+        if (difficulty === 'easy') diffText = "子供向け（具体的）";
+        if (difficulty === 'hard') diffText = "大人向け（抽象的）";
+        difficultyPrompt = `ターゲット: ${diffText}`;
     }
 
-    let diffText = "一般向け";
-    let themeText = "一般的な単語";
-    if (difficulty === 'easy') { diffText = "子供向け"; themeText = "具体的"; }
-    else if (difficulty === 'hard') { diffText = "大人向け"; themeText = "抽象的"; }
-    else if (difficulty === 'sexy') { diffText = "R-18 (成人向け)"; themeText = `セクシー、下ネタ。サブテーマ:【${subTheme}】`; }
+    // ★修正: 良い例・悪い例を提示して精度を上げる
+    examples = `
+        【良い生成例 1 (テーマ: 食べ物)】
+        village: "そば", wolf: "うどん" (※非常に似ている)
+        fox: "自動車" (※全く違うジャンルだが、日常生活にある共通点)
+
+        【良い生成例 2 (テーマ: 星)】
+        village: "地球", wolf: "火星" (※同じ惑星)
+        fox: "オットセイ" (※全く違う生物)
+
+        【悪い生成例 (絶対避けること)】
+        village: "そば", wolf: "うどん", fox: "白米" 
+        (※理由: 全て食べ物でジャンルが被っているためNG)
+    `;
 
     const bannedWords = usedWordsHistory.join(", ");
 
     const prompt = `
-        ワードウルフのお題を作成。
-        ターゲット: ${diffText}, テーマ: ${themeText}
+        ワードウルフのお題を作成してください。
+        ${difficultyPrompt}
         
         【重要：禁止ワード】
-        以下の単語は過去に使用したため、今回は**絶対に使用しないでください**:
         [ ${bannedWords} ]
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - 議論しないと見分けがつかないレベル。（例：うどん vs そば）
-           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位**と**女騎乗位**、**おっぱい**と**ぱい**など）。
-　　　　　　- 名詞を使用すること
+           - **機能・形状・ジャンルが90%一致する酷似した単語**。
+           - 議論しないと見分けがつかないレベル。
+           - 包含関係（例：ビールと生ビール）は禁止。
 
         2. "fox" (第三勢力) :
-           - village/wolfとは**「全く違う」単語**。
-           - ただし、会話に参加できる程度の共通点は持たせること。
-           - カテゴリーや質感が決定的に違うもの。
+           - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**。
+           - ただし、会話に参加できる「大きな共通点（見た目、動作、質感など）」は必ず持たせること。
+           - **絶対にvillage/wolfと同ジャンル（例：全員食べ物、全員性具）にしてはいけない。**
+
+        ${examples}
         
         【出力形式】
         JSON形式のみ出力(マークダウン禁止)。
-        { "village":"...", "wolf":"...", "fox":"...", "reason":"簡単な解説" }
+        { "village":"...", "wolf":"...", "fox":"...", "reason":"選定理由の解説" }
     `;
 
     try {
@@ -105,7 +131,7 @@ async function generateWords(difficulty) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 1.0 },
+                generationConfig: { temperature: 1.1 }, // 創造性
                 safetySettings: SAFETY_SETTINGS
             })
         });
@@ -179,14 +205,58 @@ function startServerTimer(duration, autoStart = true) {
     }
 }
 
+// ★追加: 投票判定ロジック（共通化）
+function checkVotingCompletion() {
+    // 投票権がある人数（死んだ狐は除く）
+    let eligibleVoters = players.length;
+    if (deadFoxId) eligibleVoters -= 1;
+
+    // 現在の投票数
+    if (votesReceived >= eligibleVoters) {
+        const victim = calculateVoteResult();
+        
+        if (gameState === 'VOTING_FOX') {
+            if (victim.role === 'fox') {
+                deadFoxId = victim.id; 
+                io.emit('fox_caught', { victimName: victim.name });
+                io.to(deadFoxId).emit('start_fox_challenge');
+                setTimeout(() => {
+                    gameState = 'VOTING_WOLF';
+                    votesReceived = 0;
+                    // ★重要: フラグのリセット
+                    players.forEach(p => { 
+                        p.voteCount = 0; 
+                        p.voters = []; 
+                        p.status.hasVoted = false; 
+                    });
+                    io.emit('show_voting_screen', { players, phase: 'WOLF', deadFoxId: deadFoxId });
+                    startServerTimer(30, true); 
+                }, 4000); 
+            } else {
+                gameState = 'RESULT';
+                io.emit('game_result', { players, winner: 'FOX', victimName: victim.name, reason: currentWords.reason });
+            }
+        } 
+        else if (gameState === 'VOTING_WOLF') {
+            gameState = 'RESULT';
+            if (victim.role === 'wolf') {
+                io.emit('game_result', { players, winner: 'VILLAGE', victimName: victim.name, reason: currentWords.reason });
+            } else {
+                io.emit('game_result', { players, winner: 'WOLF', victimName: victim.name, reason: currentWords.reason });
+            }
+        }
+    }
+}
+
 io.on('connection', (socket) => {
     socket.emit('timer_update', timer.timeLeft);
 
     socket.on('join_game', (playerName) => {
         const existing = players.find(p => p.name === playerName);
+        // ★修正: hasVotedフラグを追加
         const newPlayer = { 
             id: socket.id, name: playerName, role: '', word: '', voteCount: 0, 
-            status: { question: false, answer: false }, voters: [] 
+            status: { question: false, answer: false, hasVoted: false }, voters: [] 
         };
 
         if (gameState === 'WAITING') {
@@ -203,6 +273,7 @@ io.on('connection', (socket) => {
                     socket.emit('show_voting_screen', { players, phase: gameState, deadFoxId });
                 }
                 if(gameState === 'RESULT') socket.emit('game_result', { players, winner: 'unknown', reason: currentWords.reason });
+                
                 if(existing.id === deadFoxId && gameState === 'VOTING_WOLF') {
                     socket.emit('start_fox_challenge');
                 }
@@ -261,13 +332,15 @@ io.on('connection', (socket) => {
 
         gameState = 'PLAYING';
         votesReceived = 0;
-        deadFoxId = null;
-        simultaneousAnswers = []; // リセット
+        deadFoxId = null; 
         
         startServerTimer(30, false);
 
+        // ★修正: フラグ初期化
         players.forEach(p => { 
-            p.voteCount = 0; p.status = { question: false, answer: false }; p.voters = []; 
+            p.voteCount = 0; 
+            p.status = { question: false, answer: false, hasVoted: false }; 
+            p.voters = []; 
         });
 
         const words = await generateWords(diff);
@@ -323,55 +396,35 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ★変更: 一斉回答の抽選機能
     socket.on('trigger_random_pick', ({ type }) => {
         if (players.length === 0) return;
-        
         let candidates = [];
-        if (type === 'question') {
-            candidates = players.filter(p => !p.status.question);
-        } else if (type === 'answer') {
-            candidates = players.filter(p => !p.status.answer);
-        }
-        if (candidates.length === 0) candidates = [...players]; // 全員済んでたら全員対象
-
-        // 回答者指名の時だけ「一斉回答」を候補に混ぜる
+        if (type === 'question') candidates = players.filter(p => !p.status.question);
+        else if (type === 'answer') candidates = players.filter(p => !p.status.answer);
+        if (candidates.length === 0) candidates = players;
+        
         if (type === 'answer') {
-            // 候補者リスト + 一斉回答(special ID)
             const options = [...candidates, { id: 'ALL_SIMULTANEOUS', name: '一斉回答' }];
             const result = options[Math.floor(Math.random() * options.length)];
-            
             if (result.id === 'ALL_SIMULTANEOUS') {
-                // 一斉回答モード発動
-                simultaneousAnswers = []; // リセット
+                simultaneousAnswers = [];
                 io.emit('start_simultaneous_mode');
             } else {
                 io.emit('random_pick_result', { name: result.name, type: type });
             }
         } else {
-            // 質問者指名は通常通り
             const randomPlayer = candidates[Math.floor(Math.random() * candidates.length)];
             io.emit('random_pick_result', { name: randomPlayer.name, type: type });
         }
     });
 
-    // ★追加: 一斉回答の受信と開示
     socket.on('submit_simultaneous_answer', (answerText) => {
         const player = players.find(p => p.id === socket.id);
         if (!player) return;
-
-        // 既に提出済みなら更新、なければ追加
         const existing = simultaneousAnswers.find(a => a.id === socket.id);
-        if (existing) {
-            existing.text = answerText;
-        } else {
-            simultaneousAnswers.push({ id: socket.id, name: player.name, text: answerText });
-        }
-
-        // 提出状況を通知（中身は見せない）
+        if (existing) { existing.text = answerText; } 
+        else { simultaneousAnswers.push({ id: socket.id, name: player.name, text: answerText }); }
         io.emit('update_simultaneous_progress', simultaneousAnswers.length, players.length);
-
-        // 全員提出したら開示
         if (simultaneousAnswers.length >= players.length) {
             io.emit('reveal_simultaneous_answers', simultaneousAnswers);
         }
@@ -381,7 +434,13 @@ io.on('connection', (socket) => {
         if (timer.intervalId) clearInterval(timer.intervalId);
         timer.isRunning = false;
         gameState = 'VOTING_FOX';
+        
+        // ★修正: 投票フラグをリセット
+        players.forEach(p => p.status.hasVoted = false);
+        votesReceived = 0;
+
         io.emit('show_voting_screen', { players, phase: 'FOX', deadFoxId: null });
+        startServerTimer(30, true);
     });
 
     socket.on('submit_vote', ({ targetId, voterId }) => {
@@ -389,53 +448,28 @@ io.on('connection', (socket) => {
         const voter = players.find(p => p.id === voterId);
         if (voterId === deadFoxId) return;
 
-        if(target && voter) { 
+        // ★修正: 二重投票防止と投票済みフラグ
+        if (!voter || voter.status.hasVoted) return; 
+
+        if(target) { 
             target.voteCount++; 
             target.voters.push(voter.name);
+            voter.status.hasVoted = true; // 投票済みにする
             votesReceived++; 
         }
 
-        let requiredVotes = players.length;
-        if (deadFoxId) requiredVotes -= 1;
-
-        if(votesReceived >= requiredVotes) {
-            const victim = calculateVoteResult();
-            
-            if (gameState === 'VOTING_FOX') {
-                if (victim.role === 'fox') {
-                    deadFoxId = victim.id; 
-                    io.emit('fox_caught', { victimName: victim.name });
-                    io.to(deadFoxId).emit('start_fox_challenge');
-                    setTimeout(() => {
-                        gameState = 'VOTING_WOLF';
-                        votesReceived = 0;
-                        players.forEach(p => { p.voteCount = 0; p.voters = []; });
-                        io.emit('show_voting_screen', { players, phase: 'WOLF', deadFoxId: deadFoxId });
-                        startServerTimer(30, true); 
-                    }, 4000); 
-                } else {
-                    gameState = 'RESULT';
-                    io.emit('game_result', { players, winner: 'FOX', victimName: victim.name, reason: currentWords.reason });
-                }
-            } 
-            else if (gameState === 'VOTING_WOLF') {
-                gameState = 'RESULT';
-                if (victim.role === 'wolf') {
-                    io.emit('game_result', { players, winner: 'VILLAGE', victimName: victim.name, reason: currentWords.reason });
-                } else {
-                    io.emit('game_result', { players, winner: 'WOLF', victimName: victim.name, reason: currentWords.reason });
-                }
-            }
-        }
+        // 判定ロジックへ
+        checkVotingCompletion();
     });
 
     socket.on('trigger_next_game', () => {
         gameState = 'WAITING';
         votesReceived = 0; deadFoxId = null;
-        simultaneousAnswers = [];
         if (timer.intervalId) clearInterval(timer.intervalId);
+        simultaneousAnswers = [];
         players.forEach(p => { 
-            p.role=''; p.word=''; p.voteCount=0; p.voters=[]; p.status = { question: false, answer: false }; 
+            p.role=''; p.word=''; p.voteCount=0; p.voters=[]; 
+            p.status = { question: false, answer: false, hasVoted: false }; 
         });
         io.emit('reset_game'); 
         io.emit('update_players', players);
@@ -451,6 +485,16 @@ io.on('connection', (socket) => {
         if (gameState === 'WAITING') {
             players = players.filter(p => p.id !== socket.id);
             io.emit('update_players', players);
+        } else if (gameState.startsWith('VOTING')) {
+            // ★修正: 投票中に切断があった場合、その人を無効化して判定を進める
+            const leaver = players.find(p => p.id === socket.id);
+            if(leaver && leaver.status.hasVoted) {
+                // 既に投票済みなら票数は減らさない
+            } else {
+                // 未投票なら、これ以上票は増えないので判定を試みる
+                players = players.filter(p => p.id !== socket.id); // リストから削除
+                checkVotingCompletion(); // 人数が減った状態で判定
+            }
         }
     });
 });
