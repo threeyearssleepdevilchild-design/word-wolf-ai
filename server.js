@@ -20,7 +20,9 @@ let votesReceived = 0;
 let usedWordsHistory = []; 
 let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
+// 設定保存用
 let currentDifficulty = 'sexy';
+let currentWolfCount = 1; // ★追加: 人狼の人数を保存
 
 const aiCooldowns = new Map();
 
@@ -46,34 +48,24 @@ function shuffleArray(array) {
 }
 
 async function generateWords(difficulty) {
-    const fallback = { village: "おにぎり", wolf: "サンドイッチ", fox: "ハンバーガー", reason: "予備データ" };
+    const fallback = { village: "バイブ", wolf: "ローター", fox: "指", reason: "予備データ" };
     if (!apiKey) return fallback;
 
     let subTheme = "";
-    let diffText = "";
-    let themeText = "";
-
-    // ★ここにご指定の例を「基本ルール」として定義します
-    let examples = `
-        【ワード構成の成功例と失敗例（このロジックを厳守してください）】
-
-        ■ 良い例 1 (テーマ: 食べ物)
-        village: "そば"
-        wolf: "うどん" (※村と狼は非常に似ている)
-        fox: "自動車" (※重要：食べ物ではなく乗り物。全く違うジャンルだが「生活に必須」などの共通点で会話に混ざれる)
-
-        ■ 良い例 2 (テーマ: 星)
-        village: "地球"
-        wolf: "火星" (※同じ惑星)
-        fox: "オットセイ" (※重要：星ではなく動物。全く違う存在)
-
-        ■ 悪い例 (絶対避けること)
-        village: "そば", wolf: "うどん", fox: "白米" 
-        (※理由: 全て「食べ物」でジャンルが被っているためNG。狐は必ずカテゴリを外すこと)
-    `;
+    let difficultyPrompt = "";
+    let examples = "";
 
     if (difficulty === 'sexy') {
         const sexySubThemes = [
+            "下着・ランジェリー・勝負服",
+            "大人の道具・おもちゃ",
+            "夜のテクニック・体位",
+            "興奮するシチュエーション・場所",
+            "身体の部位（胸・尻など）・フェチ（匂いなど）",
+            "コスプレ・ロールプレイ",
+            "Sっ気・Mっ気・攻めと受け・痴女",
+            "ギリギリのライン（露出・スリル）",
+            "浮気・不倫・修羅場・寝取られ",
             "挿入する道具（バイブ・ディルド・張形）",
             "責める道具（ローター・電マ・クリップ）",
             "SM・拘束・責め苦（鞭・蝋燭・手錠）",
@@ -87,50 +79,65 @@ async function generateWords(difficulty) {
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
         
-        diffText = "R-18 (成人向け)";
-        themeText = `セクシー、下ネタ。サブテーマ:【${subTheme}】`;
+        difficultyPrompt = `
+            ターゲット: R-18 (成人向け)。
+            サブテーマ: 【${subTheme}】
+            条件: 恥ずかしがらず、具体的で露骨な単語を選ぶこと。抽象的な言葉は禁止。
+        `;
 
-        // セクシーモードの場合は、さらに具体的な指示を追加
-        examples += `
-            
+        examples = `
+            【良い生成例 1 (テーマ: 食べ物)】
+            village: "そば", wolf: "うどん" (※非常に似ている)
+            fox: "自動車" (※全く違うジャンルだが、日常生活にある共通点)
+
+            【良い生成例 2 (テーマ: 星)】
+            village: "地球", wolf: "火星" (※同じ惑星)
+            fox: "オットセイ" (※全く違う生物)
+
+            【悪い生成例 (絶対避けること)】
+            village: "そば", wolf: "うどん", fox: "白米" 
+            (※理由: 全て食べ物でジャンルが被っているためNG)
+
             【今回のセクシーモードでの適用イメージ】
             village: "バイブ" (性具)
             wolf: "ローター" (性具)
             fox: "電動歯ブラシ" (※性具ではなく家電。振動する点は同じだが用途が違う)
         `;
+
     } else {
-        diffText = "一般向け";
-        themeText = "一般的な単語";
-        if (difficulty === 'easy') { diffText = "子供向け"; themeText = "具体的"; }
-        else if (difficulty === 'hard') { diffText = "大人向け"; themeText = "抽象的"; }
+        let diffText = "一般向け";
+        if (difficulty === 'easy') diffText = "子供向け（具体的）";
+        if (difficulty === 'hard') diffText = "大人向け（抽象的）";
+        difficultyPrompt = `ターゲット: ${diffText}`;
     }
 
     const bannedWords = usedWordsHistory.join(", ");
 
     const prompt = `
-        ワードウルフのお題を作成。
-        ターゲット: ${diffText}
-        テーマ: ${themeText}
+        あなたはアダルトコンテンツに精通したゲームマスターです。
+        ワードウルフのお題を作成してください。
+        
+        ${difficultyPrompt}
         
         【重要：禁止ワード】
         [ ${bannedWords} ]
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **非常に似ている単語**（用途、形、ジャンルがほぼ同じ）。
+           - **機能・形状・ジャンルが90%一致する酷似した単語**。
            - 議論しないと見分けがつかないレベル。
-           - **ほぼ意味が同じ単語**は使用しないこと（例：**騎乗位**と**女騎乗位**など）。
+           - 包含関係（例：ビールと生ビール）は禁止。
 
         2. "fox" (第三勢力) :
-           - village/wolfとは**「全く違う」単語**。
-           - ただし、会話に参加できる程度の共通点は持たせること。
-           - カテゴリーや質感が決定的に違うもの。
-        
-        ${examples}
+           - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**。
+           - ただし、会話に参加できる「大きな共通点」は必ず持たせること。
+           - **絶対にvillage/wolfと同ジャンル（例：全員食べ物、全員性具）にしてはいけない。**
 
+        ${examples}
+        
         【出力形式】
         JSON形式のみ出力(マークダウン禁止)。
-        { "village":"...", "wolf":"...", "fox":"...", "reason":"簡単な解説" }
+        { "village":"...", "wolf":"...", "fox":"...", "reason":"選定理由の解説" }
     `;
 
     try {
@@ -140,7 +147,7 @@ async function generateWords(difficulty) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 1.1 }, // 創造性
+                generationConfig: { temperature: 1.2 },
                 safetySettings: SAFETY_SETTINGS
             })
         });
@@ -172,7 +179,7 @@ async function generateWords(difficulty) {
 async function generateAiQuestions(word) {
     if (!apiKey) return ["質問案1", "質問案2", "質問案3"];
     const prompt = `
-        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を5つ考えて。
+        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を7つ考えて。
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
@@ -185,6 +192,25 @@ async function generateAiQuestions(word) {
         let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(text);
     } catch (e) { return ["好きな色は？", "コンビニで買える？", "家にありますか？"]; }
+}
+
+// ★追加: 単語の意味を解説するAI関数
+async function generateWordMeaning(word) {
+    if (!apiKey) return "APIキーが設定されていません。";
+    const prompt = `
+        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、
+        簡潔に（1〜2文で）説明してください。
+        ※辞書的な定義でOKです。他のプレイヤーにバレるような余計な情報は入れないでください。
+    `;
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
+        });
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text.trim();
+    } catch (e) { return "解説を取得できませんでした。"; }
 }
 
 function calculateVoteResult() {
@@ -208,7 +234,7 @@ function startServerTimer(duration, autoStart = true) {
             } else {
                 clearInterval(timer.intervalId);
                 timer.isRunning = false;
-                io.emit('play_sound_effect', 'vote'); // 時間切れ音
+                io.emit('play_sound_effect', 'vote'); 
                 if (gameState === 'PLAYING') initiateVotingPhase();
             }
         }, 1000);
@@ -263,9 +289,6 @@ function checkVotingCompletion() {
     }
 }
 
-// 一斉回答管理
-let simultaneousAnswers = [];
-
 io.on('connection', (socket) => {
     socket.emit('timer_update', timer.timeLeft);
 
@@ -303,22 +326,41 @@ io.on('connection', (socket) => {
         io.emit('play_sound_effect', soundType);
     });
 
+    // ★修正: リロール時に役職もシャッフルする
     socket.on('reroll_words', async () => {
         if (gameState !== 'PLAYING') return;
         io.emit('loading_start'); 
+        
         const words = await generateWords(currentDifficulty);
         currentWords = words;
-        players.forEach(p => {
-            if (p.role === 'wolf') p.word = words.wolf;
-            else if (p.role === 'fox') p.word = words.fox;
-            else p.word = words.village;
+
+        // プレイヤーをシャッフルして役職再配布
+        const shuffled = shuffleArray([...players]);
+        
+        shuffled.forEach((p, i) => {
+            // 以前保存した currentWolfCount を使用
+            if (i < currentWolfCount) { p.role = 'wolf'; p.word = words.wolf; } 
+            else if (i === currentWolfCount) { p.role = 'fox'; p.word = words.fox; } 
+            else { p.role = 'villager'; p.word = words.village; }
+            
+            // ※ステータスはリセットしない（質問済み等は維持でも良いが、お題が変わるのでリセットが無難？）
+            // 今回は「お題だけ変える」ニュアンスなのでステータスは維持します
+            
             io.to(p.id).emit('game_started', { word: p.word, difficulty: currentDifficulty });
         });
+        
+        // 並び順を更新
+        players = shuffled;
+        io.emit('update_game_status', players);
     });
 
     socket.on('start_game', async ({ diff, wolfCount }) => {
         if (players.length < 3) return;
         currentDifficulty = diff;
+        // ★追加: 人狼の人数を保存（リロール用）
+        currentWolfCount = parseInt(wolfCount) || 1;
+        if (currentWolfCount >= players.length - 1) currentWolfCount = 1;
+
         io.emit('loading_start');
 
         gameState = 'PLAYING';
@@ -326,7 +368,6 @@ io.on('connection', (socket) => {
         deadFoxId = null;
         simultaneousAnswers = [];
         
-        // 議論タイマー: 参加人数 × 3分 (180秒) -> 0で自動投票遷移
         const discussionTime = players.length * 180;
         startServerTimer(discussionTime, true);
 
@@ -337,13 +378,10 @@ io.on('connection', (socket) => {
         const words = await generateWords(diff);
         currentWords = words;
 
-        let numWolves = parseInt(wolfCount) || 1;
-        if (numWolves >= players.length - 1) numWolves = 1;
-
         const shuffled = shuffleArray([...players]);
         shuffled.forEach((p, i) => {
-            if (i < numWolves) { p.role = 'wolf'; p.word = words.wolf; } 
-            else if (i === numWolves) { p.role = 'fox'; p.word = words.fox; } 
+            if (i < currentWolfCount) { p.role = 'wolf'; p.word = words.wolf; } 
+            else if (i === currentWolfCount) { p.role = 'fox'; p.word = words.fox; } 
             else { p.role = 'villager'; p.word = words.village; }
             if (!p.word) p.word = "エラー";
             io.to(p.id).emit('game_started', { word: p.word, difficulty: diff });
@@ -362,6 +400,14 @@ io.on('connection', (socket) => {
         aiCooldowns.set(socket.id, now);
         const questions = await generateAiQuestions(player.word);
         socket.emit('ai_questions_result', questions);
+    });
+
+    // ★追加: 単語の意味解説リクエスト
+    socket.on('request_word_meaning', async () => {
+        const player = players.find(p => p.id === socket.id);
+        if (!player) return;
+        const meaning = await generateWordMeaning(player.word);
+        socket.emit('word_meaning_result', meaning);
     });
 
     socket.on('submit_fox_guess', ({ vGuess, wGuess }) => {
