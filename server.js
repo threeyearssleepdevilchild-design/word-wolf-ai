@@ -193,8 +193,8 @@ async function generateWordMeaning(word) {
     if (!apiKey) return "APIキーが設定されていません。";
     const prompt = `
         単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、
-        簡潔に（1〜2文で）説明してください。
-        ※辞書的な定義でOKです。他のプレイヤーにバレるような余計な情報は入れないでください。
+        説明してください。
+        単語の意味は成人向けのワードとしての意味を考えて説明してください。
     `;
     try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
