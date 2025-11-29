@@ -24,12 +24,12 @@
         button.next-btn { background-color: #4CAF50; margin-top: 20px; font-size: 1.2rem; }
         button.copy-btn { background-color: #0f3460; margin-top: 5px; font-size: 0.9rem;}
         button.reroll-btn { background: #ff9800; font-size: 0.8rem; padding: 8px; margin-bottom: 10px; }
+        
         .gacha-container { display: flex; gap: 10px; margin-top: 20px; }
         .gacha-btn { flex: 1; border: 2px solid #fff; color: #333; font-size: 0.9rem; padding: 10px; }
         .gacha-q { background: linear-gradient(45deg, #ff9a9e, #fecfef); }
         .gacha-a { background: linear-gradient(45deg, #a18cd1, #fbc2eb); }
         
-        /* タイマー */
         .timer-container {
             background: rgba(0,0,0,0.5); border-radius: 10px; padding: 10px; margin-bottom: 15px;
             display: flex; flex-direction: column; align-items: center;
@@ -47,6 +47,10 @@
         .ai-hint-list { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; text-align: left; font-size: 0.9rem; color: #add8e6; }
         #reason-box { background: rgba(255, 255, 255, 0.1); padding: 10px; margin: 15px 0; border-radius: 10px; font-size: 0.9rem; color: #ccc; border-left: 4px solid #3498db; text-align: left; }
         
+        /* 意味調べボタンのスタイル */
+        .meaning-btn { background: #607d8b; margin-bottom: 10px; font-size: 0.9rem; }
+        #meaning-box { background: rgba(255, 255, 255, 0.1); padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 0.9rem; color: #ddd; text-align: left; }
+
         .se-container { display: flex; gap: 10px; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 15px; }
         .se-btn { padding: 10px; margin: 0; font-size: 0.9rem; background: transparent; border: 2px solid #fff; }
         .se-nice { border-color: #ffd700; color: #ffd700; }
@@ -76,10 +80,6 @@
         .vote-count { font-size: 1.2rem; font-weight: bold; color: #e94560; }
         .voters-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-top: 5px; }
         .voter-tag { font-size: 0.7rem; background: #333; padding: 2px 6px; border-radius: 4px; color: #aaa; border: 1px solid #555; }
-        
-        /* 意味解説用 */
-        .meaning-btn { background: #607d8b; font-size: 0.8rem; padding: 5px 10px; margin-top: 10px; width: auto; display: inline-block; }
-        #meaning-box { background: rgba(255, 255, 255, 0.1); padding: 10px; margin-top: 10px; border-radius: 5px; font-size: 0.9rem; color: #ddd; text-align: left; }
     </style>
 </head>
 <body>
@@ -90,6 +90,7 @@
         <p>AIが思考中...<br>🧠💭</p>
     </div>
 
+    <!-- 画像演出用コンテナ -->
     <div id="visual-effect-container"></div>
 
     <!-- 一斉回答 -->
@@ -152,17 +153,17 @@
             <div style="font-size:0.8rem; color:#aaa; margin-top:5px;">時間切れで投票へ移動します</div>
         </div>
 
+        <!-- カード部分 -->
         <div class="card-container" onclick="flipCard()">
             <div class="card-inner" id="word-card-inner">
                 <div class="card-front">タップして確認</div>
-                <div class="card-back">
-                    <div id="word-display">???</div>
-                    <!-- ★追加: ワードの意味を調べるボタン -->
-                    <button class="meaning-btn" onclick="event.stopPropagation(); requestWordMeaning()">📖 意味を調べる</button>
-                    <div id="meaning-box" class="hidden"></div>
-                </div>
+                <div class="card-back" id="word-display">???</div>
             </div>
         </div>
+        
+        <!-- ★変更: 意味調べボタンを外に出しました -->
+        <button class="meaning-btn" onclick="requestWordMeaning()">📖 このワードの意味を調べる</button>
+        <div id="meaning-box" class="hidden"></div>
         
         <div class="se-container">
             <button class="se-btn se-nice" onclick="emitSound('nice')">👍 ナイス！</button>
@@ -301,7 +302,6 @@
         function copyUrl() { navigator.clipboard.writeText(window.location.href).then(() => alert("コピーしました")); }
         function flipCard() { document.getElementById('word-card-inner').classList.toggle('flipped'); }
 
-        // ★追加: 単語の意味をリクエスト
         function requestWordMeaning() {
             document.getElementById('meaning-box').innerHTML = "AI検索中...";
             document.getElementById('meaning-box').classList.remove('hidden');
