@@ -20,9 +20,8 @@ let votesReceived = 0;
 let usedWordsHistory = []; 
 let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
-// 設定保存用
 let currentDifficulty = 'sexy';
-let currentWolfCount = 1; // ★追加: 人狼の人数を保存
+let currentWolfCount = 1;
 
 const aiCooldowns = new Map();
 
@@ -57,8 +56,14 @@ async function generateWords(difficulty) {
 
     if (difficulty === 'sexy') {
         const sexySubThemes = [
+            "下着・ランジェリー・勝負服",
             "大人の道具・おもちゃ",
             "夜のテクニック・体位",
+            "興奮するシチュエーション・場所",
+            "身体の部位（胸・尻など）・フェチ（匂いなど）",
+            "コスプレ・ロールプレイ",
+            "Sっ気・Mっ気・攻めと受け・痴女",
+            "ギリギリのライン（露出・スリル）",
             "浮気・不倫・修羅場・寝取られ",
             "挿入する道具（バイブ・ディルド・張形）",
             "責める道具（ローター・電マ・クリップ）",
@@ -66,7 +71,6 @@ async function generateWords(difficulty) {
             "具体的な体位・プレイ（騎乗位・バック・対面座位）",
             "口や舌を使う行為（フェラ・クンニ・69）",
             "汁・分泌液（精液・潮・愛液・唾液）",
-            "フェチ・部位（足コキ・パイズリ・脇・匂い・尻・巨乳・貧乳）",
             "NTR・不倫・竿姉妹・穴兄弟",
             "アナル・浣腸・放尿",
             "露出・痴漢・のぞき・ハプニング"
@@ -118,9 +122,10 @@ async function generateWords(difficulty) {
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **機能・形状・ジャンルが90%一致する酷似した単語**。
+           - **機能・形状・ジャンルが50%一致する酷似した単語**。
            - 議論しないと見分けがつかないレベル。
            - 包含関係（例：ビールと生ビール）は禁止。
+           - 日本語と英語に訳しただけのワード（例：電マとワンドマッサージャー）は禁止。
 
         2. "fox" (第三勢力) :
            - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**。
@@ -173,7 +178,7 @@ async function generateWords(difficulty) {
 async function generateAiQuestions(word) {
     if (!apiKey) return ["質問案1", "質問案2", "質問案3"];
     const prompt = `
-        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を7つ考えて。
+        ワードウルフ「${word}」について、バレないような当たり障りのない質問を3つ考えて。
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
@@ -188,13 +193,12 @@ async function generateAiQuestions(word) {
     } catch (e) { return ["好きな色は？", "コンビニで買える？", "家にありますか？"]; }
 }
 
-// ★追加: 単語の意味を解説するAI関数
 async function generateWordMeaning(word) {
     if (!apiKey) return "APIキーが設定されていません。";
     const prompt = `
         単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、
-        説明してください。
-        単語の意味は成人向けのワードとしての意味を考えて説明してください。
+        簡潔に説明してください。
+        単語の意味は成人向けのワードとしての意味を考慮してください。
     `;
     try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
@@ -244,7 +248,6 @@ function initiateVotingPhase() {
     io.emit('show_voting_screen', { players, phase: 'FOX', deadFoxId: null });
 }
 
-// 投票判定ロジック
 function checkVotingCompletion() {
     let eligibleVoters = players.length;
     if (deadFoxId) eligibleVoters -= 1;
@@ -283,6 +286,8 @@ function checkVotingCompletion() {
     }
 }
 
+let simultaneousAnswers = [];
+
 io.on('connection', (socket) => {
     socket.emit('timer_update', timer.timeLeft);
 
@@ -320,30 +325,21 @@ io.on('connection', (socket) => {
         io.emit('play_sound_effect', soundType);
     });
 
-    // ★修正: リロール時に役職もシャッフルする
     socket.on('reroll_words', async () => {
         if (gameState !== 'PLAYING') return;
         io.emit('loading_start'); 
-        
         const words = await generateWords(currentDifficulty);
         currentWords = words;
-
-        // プレイヤーをシャッフルして役職再配布
-        const shuffled = shuffleArray([...players]);
         
+        const shuffled = shuffleArray([...players]);
+
         shuffled.forEach((p, i) => {
-            // 以前保存した currentWolfCount を使用
             if (i < currentWolfCount) { p.role = 'wolf'; p.word = words.wolf; } 
             else if (i === currentWolfCount) { p.role = 'fox'; p.word = words.fox; } 
             else { p.role = 'villager'; p.word = words.village; }
             
-            // ※ステータスはリセットしない（質問済み等は維持でも良いが、お題が変わるのでリセットが無難？）
-            // 今回は「お題だけ変える」ニュアンスなのでステータスは維持します
-            
             io.to(p.id).emit('game_started', { word: p.word, difficulty: currentDifficulty });
         });
-        
-        // 並び順を更新
         players = shuffled;
         io.emit('update_game_status', players);
     });
@@ -351,7 +347,6 @@ io.on('connection', (socket) => {
     socket.on('start_game', async ({ diff, wolfCount }) => {
         if (players.length < 3) return;
         currentDifficulty = diff;
-        // ★追加: 人狼の人数を保存（リロール用）
         currentWolfCount = parseInt(wolfCount) || 1;
         if (currentWolfCount >= players.length - 1) currentWolfCount = 1;
 
@@ -396,7 +391,6 @@ io.on('connection', (socket) => {
         socket.emit('ai_questions_result', questions);
     });
 
-    // ★追加: 単語の意味解説リクエスト
     socket.on('request_word_meaning', async () => {
         const player = players.find(p => p.id === socket.id);
         if (!player) return;
@@ -486,8 +480,7 @@ io.on('connection', (socket) => {
         if (timer.intervalId) clearInterval(timer.intervalId);
         simultaneousAnswers = [];
         players.forEach(p => { 
-            p.role=''; p.word=''; p.voteCount=0; p.voters=[]; 
-            p.status = { question: false, answer: false, hasVoted: false }; 
+            p.role=''; p.word=''; p.voteCount=0; p.voters=[]; p.status = { question: false, answer: false, hasVoted: false }; 
         });
         io.emit('reset_game'); 
         io.emit('update_players', players);
