@@ -195,8 +195,7 @@ async function generateAiQuestions(word) {
 async function generateWordMeaning(word) {
     if (!apiKey) return "APIキーが設定されていません。";
     const prompt = `
-        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、
-        簡潔に説明してください。
+        単語「${word}」の意味を、簡潔に説明してください。
         単語の意味は成人向けのワードとしての意味を考慮してください。
     `;
     try {
