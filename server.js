@@ -122,7 +122,7 @@ async function generateWords(difficulty) {
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **機能・形状・ジャンルが50%一致する酷似した単語**。
+           - **機能・形状・ジャンルが40%一致する酷似した単語**。
            - 議論しないと見分けがつかないレベル。
            - 包含関係（例：ビールと生ビール）は禁止。
            - 日本語と英語に訳しただけのワード（例：電マとワンドマッサージャー）は禁止。
@@ -196,7 +196,6 @@ async function generateWordMeaning(word) {
     if (!apiKey) return "APIキーが設定されていません。";
     const prompt = `
         単語「${word}」の意味を、簡潔に説明してください。
-        単語の意味は成人向けのワードとしての意味を考慮してください。
     `;
     try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
