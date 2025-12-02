@@ -62,10 +62,31 @@
         .pop-image { width: 200px; height: 200px; object-fit: contain; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
 
-        #fox-challenge-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44, 11, 14, 0.98); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        #fox-input-v, #fox-input-w { background: #5a1e23; border: 1px solid #ff6b6b; color: white; width: 80%; font-size: 1.1rem; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
+        /* 狐逆転 & 一斉回答 オーバーレイ共通設定 */
+        #fox-challenge-overlay, #simultaneous-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100vh; /* 画面全体 */
+            background: rgba(26, 26, 46, 0.98); z-index: 2500; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            padding: 20px; box-sizing: border-box;
+        }
+        
+        #fox-input-v, #fox-input-w, #simul-input { 
+            background: #5a1e23; border: 1px solid #ff6b6b; color: white; width: 80%; 
+            font-size: 1.2rem; margin-bottom: 15px; padding: 15px; border-radius: 5px; 
+        }
+        #simul-input { background: #1a1a2e; border: 1px solid #4CAF50; } /* 一斉回答は緑系 */
+
         #fox-timer-display { font-size: 3rem; color: #ff6b6b; font-weight: bold; margin: 20px; }
+
+        /* 一斉回答リスト */
+        .simul-list { width: 100%; max-width: 500px; max-height: 70vh; overflow-y: auto; list-style: none; padding: 0; margin-top: 20px;}
+        .simul-item { background: rgba(255,255,255,0.1); margin: 10px; padding: 15px; border-radius: 8px; text-align: left; }
+        .simul-name { color: #e94560; font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; }
+        .simul-text { font-size: 1.2rem; font-weight: bold; color: #fff; }
+
         .role-wolf { color: #ff6b6b; font-weight: bold; } .role-fox { color: #feca57; font-weight: bold; } .role-villager { color: #1dd1a1; font-weight: bold; }
+        .voter-names { font-size: 0.75rem; color: #aaa; display: block; text-align: right; margin-top: 3px; }
+        
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
         .spinner { width: 50px; height: 50px; border: 5px solid rgba(233, 69, 96, 0.3); border-top: 5px solid #e94560; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -94,18 +115,19 @@
 
     <div id="visual-effect-container"></div>
 
-    <div id="simultaneous-overlay" class="hidden animate__animated animate__fadeInUp">
+    <!-- 一斉回答（★修正: アニメーションクラスを変更し、確実に表示されるように調整） -->
+    <div id="simultaneous-overlay" class="hidden animate__animated animate__fadeIn">
         <div id="simul-input-area" style="text-align:center; width:100%;">
-            <h2 style="color:#4CAF50;">⚡ 一斉回答チャンス！ ⚡</h2>
-            <p>全員の回答が出揃うまで公開されません</p>
-            <input type="text" id="simul-input" placeholder="回答を入力...">
-            <button onclick="submitSimulAnswer()" style="background:#4CAF50; font-size:1.2rem; padding:15px; width:80%;">送信</button>
+            <h2 style="color:#4CAF50; font-size: 2rem;">⚡ 一斉回答チャンス！ ⚡</h2>
+            <p style="color:#ddd; margin-bottom: 20px;">全員の回答が出揃うまで公開されません</p>
+            <input type="text" id="simul-input" placeholder="ここに回答を入力..." autocomplete="off">
+            <button onclick="submitSimulAnswer()" style="background:#4CAF50; font-size:1.2rem; padding:15px; width:80%; margin-top:10px;">送信する</button>
             <p id="simul-status" style="margin-top:20px; color:#aaa;">待機中...</p>
         </div>
         <div id="simul-result-area" class="hidden" style="text-align:center; width:100%;">
             <h2>📝 全員の回答</h2>
             <ul id="simul-result-list" class="simul-list"></ul>
-            <button onclick="closeSimul()" style="background:#999; margin-top:20px;">閉じる</button>
+            <button onclick="closeSimul()" style="background:#999; margin-top:20px; font-size:1.1rem; padding:10px 30px;">閉じる</button>
         </div>
     </div>
 
@@ -162,7 +184,7 @@
             </div>
         </div>
         
-        <!-- ★変更: カード外にボタン移動 -->
+        <!-- 意味調べボタン（カードの外） -->
         <button class="meaning-btn" onclick="requestWordMeaning()">📖 このワードの意味を調べる</button>
         <div id="meaning-box" class="hidden"></div>
         

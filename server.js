@@ -128,8 +128,7 @@ async function generateWords(difficulty) {
            - 日本語と英語に訳しただけのワード（例：電マとワンドマッサージャー）は禁止。
 
         2. "fox" (第三勢力) :
-           - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**。
-           - ただし、会話に参加できる「大きな共通点」は必ず持たせること。
+           - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**で会話に参加できる**「大きな共通点」を持たせないこと。**
            - **絶対にvillage/wolfと同ジャンル（例：全員食べ物、全員性具）にしてはいけない。**
 
         ${examples}
@@ -178,7 +177,7 @@ async function generateWords(difficulty) {
 async function generateAiQuestions(word) {
     if (!apiKey) return ["質問案1", "質問案2", "質問案3"];
     const prompt = `
-        ワードウルフ「${word}」について、バレないような当たり障りのない質問を3つ考えて。
+        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を7つ考えて。
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
