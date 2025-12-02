@@ -85,7 +85,7 @@ async function generateWords(difficulty) {
 
         examples = `
             【良い生成例 1 (テーマ: 食べ物)】
-            village: "そば", wolf: "うどん" (※非常に似ている)
+            village: "そば", wolf: "白米" (※食べ物つながり)
             fox: "自動車" (※全く違うジャンルだが、日常生活にある共通点)
 
             【良い生成例 2 (テーマ: 星)】
@@ -99,7 +99,7 @@ async function generateWords(difficulty) {
             【今回のセクシーモードでの適用イメージ】
             village: "バイブ" (性具)
             wolf: "ローター" (性具)
-            fox: "電動歯ブラシ" (※性具ではなく家電。振動する点は同じだが用途が違う)
+            fox: "原子力発電所" (※かすりもしない全く違うもの)
         `;
 
     } else {
