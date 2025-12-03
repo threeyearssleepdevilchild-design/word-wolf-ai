@@ -114,6 +114,8 @@ async function generateWords(difficulty) {
     const prompt = `
         あなたはアダルトコンテンツに精通したゲームマスターです。
         ワードウルフのお題を作成してください。
+        "village" と "wolf"が通常ワードで"fox"がセクシーワードになるパターンと、
+        "village" と "wolf"がセクシーワードで"fox"が通常ワードになるパターンがバランスよくなるように作成してください。
         
         ${difficultyPrompt}
         
@@ -177,7 +179,7 @@ async function generateWords(difficulty) {
 async function generateAiQuestions(word) {
     if (!apiKey) return ["質問案1", "質問案2", "質問案3"];
     const prompt = `
-        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を7つ考えて。
+        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を3つ考えて。
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
@@ -195,7 +197,8 @@ async function generateAiQuestions(word) {
 async function generateWordMeaning(word) {
     if (!apiKey) return "APIキーが設定されていません。";
     const prompt = `
-        単語「${word}」の意味を、簡潔に説明してください。
+        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、簡潔に説明してください。
+
     `;
     try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
@@ -236,6 +239,14 @@ function startServerTimer(duration, autoStart = true) {
     }
 }
 
+// ★追加：投票状況の配信
+function broadcastVoteProgress() {
+    let eligibleVoters = players.length;
+    if (deadFoxId) eligibleVoters -= 1;
+    // 全員に「現在X人 / 全Y人」を送る
+    io.emit('update_vote_progress', { current: votesReceived, total: eligibleVoters });
+}
+
 function initiateVotingPhase() {
     if (timer.intervalId) clearInterval(timer.intervalId);
     timer.isRunning = false;
@@ -243,11 +254,15 @@ function initiateVotingPhase() {
     votesReceived = 0;
     gameState = 'VOTING_FOX';
     io.emit('show_voting_screen', { players, phase: 'FOX', deadFoxId: null });
+    broadcastVoteProgress(); // 初期状態配信
 }
 
 function checkVotingCompletion() {
     let eligibleVoters = players.length;
     if (deadFoxId) eligibleVoters -= 1;
+
+    // 投票があるたびに進捗を配信
+    broadcastVoteProgress();
 
     if (votesReceived >= eligibleVoters) {
         const victim = calculateVoteResult();
@@ -256,7 +271,8 @@ function checkVotingCompletion() {
             if (victim.role === 'fox') {
                 deadFoxId = victim.id; 
                 io.emit('fox_caught', { victimName: victim.name });
-                io.to(deadFoxId).emit('start_fox_challenge');
+                // ★変更: 逆転チャレンジ削除 -> そのまま待機して狼投票へ
+                
                 setTimeout(() => {
                     gameState = 'VOTING_WOLF';
                     votesReceived = 0;
@@ -266,6 +282,7 @@ function checkVotingCompletion() {
                         p.status.hasVoted = false; 
                     });
                     io.emit('show_voting_screen', { players, phase: 'WOLF', deadFoxId: deadFoxId });
+                    broadcastVoteProgress(); // 初期状態配信
                 }, 4000); 
             } else {
                 gameState = 'RESULT';
@@ -306,11 +323,9 @@ io.on('connection', (socket) => {
                 socket.emit('update_game_status', players); 
                 if(gameState.startsWith('VOTING')) {
                     socket.emit('show_voting_screen', { players, phase: gameState, deadFoxId });
+                    broadcastVoteProgress(); // 途中参加者用
                 }
                 if(gameState === 'RESULT') socket.emit('game_result', { players, winner: 'unknown', reason: currentWords.reason });
-                if(existing.id === deadFoxId && gameState === 'VOTING_WOLF') {
-                    socket.emit('start_fox_challenge');
-                }
                 io.emit('update_players', players);
             } else {
                 socket.emit('error_msg', 'ゲーム進行中です');
@@ -327,14 +342,12 @@ io.on('connection', (socket) => {
         io.emit('loading_start'); 
         const words = await generateWords(currentDifficulty);
         currentWords = words;
-        
-        const shuffled = shuffleArray([...players]);
 
+        const shuffled = shuffleArray([...players]);
         shuffled.forEach((p, i) => {
             if (i < currentWolfCount) { p.role = 'wolf'; p.word = words.wolf; } 
             else if (i === currentWolfCount) { p.role = 'fox'; p.word = words.fox; } 
             else { p.role = 'villager'; p.word = words.village; }
-            
             io.to(p.id).emit('game_started', { word: p.word, difficulty: currentDifficulty });
         });
         players = shuffled;
@@ -354,7 +367,7 @@ io.on('connection', (socket) => {
         deadFoxId = null;
         simultaneousAnswers = [];
         
-        const discussionTime = players.length * 180;
+        const discussionTime = players.length * 180; // 3分
         startServerTimer(discussionTime, true);
 
         players.forEach(p => { 
@@ -393,20 +406,6 @@ io.on('connection', (socket) => {
         if (!player) return;
         const meaning = await generateWordMeaning(player.word);
         socket.emit('word_meaning_result', meaning);
-    });
-
-    socket.on('submit_fox_guess', ({ vGuess, wGuess }) => {
-        if (socket.id !== deadFoxId) return;
-        const isHitVillage = currentWords.village.includes(vGuess) || vGuess.includes(currentWords.village);
-        const isHitWolf = currentWords.wolf.includes(wGuess) || wGuess.includes(currentWords.wolf);
-
-        if (isHitVillage && isHitWolf) {
-            gameState = 'RESULT';
-            const winnerName = players.find(p => p.id === deadFoxId).name;
-            io.emit('game_result', { players, winner: 'FOX_REVERSE', victimName: winnerName, guessWord: `${vGuess} & ${wGuess}`, reason: currentWords.reason });
-        } else {
-            socket.emit('fox_challenge_failed');
-        }
     });
 
     socket.on('toggle_action', ({ targetId, type }) => {

@@ -35,8 +35,6 @@
             display: flex; flex-direction: column; align-items: center;
         }
         .timer-display-text { font-size: 2.5rem; font-weight: bold; color: #00ff9d; font-family: monospace; }
-        .timer-controls { display: flex; gap: 10px; margin-top: 5px; }
-        .timer-btn { padding: 5px 15px; font-size: 0.9rem; margin: 0; background: #333; border: 1px solid #555; color: white; }
 
         .card-container { perspective: 1000px; margin: 20px auto; width: 280px; height: 160px; }
         .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.8s; transform-style: preserve-3d; cursor: pointer; }
@@ -51,7 +49,7 @@
         
         /* 意味調べボタン */
         .meaning-btn { background: #607d8b; font-size: 0.9rem; padding: 8px; margin-bottom: 15px; width: 100%; }
-        #meaning-box { background: rgba(255, 255, 255, 0.1); padding: 10px; margin-bottom: 15px; border-radius: 5px; font-size: 0.9rem; color: #ddd; text-align: left; }
+        #meaning-box { background: rgba(255, 255, 255, 0.1); padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 0.9rem; color: #ddd; text-align: left; }
 
         .se-container { display: flex; gap: 10px; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 15px; }
         .se-btn { padding: 10px; margin: 0; font-size: 0.9rem; background: transparent; border: 2px solid #fff; }
@@ -62,31 +60,20 @@
         .pop-image { width: 200px; height: 200px; object-fit: contain; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
 
-        /* 狐逆転 & 一斉回答 オーバーレイ共通設定 */
-        #fox-challenge-overlay, #simultaneous-overlay { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100vh; /* 画面全体 */
-            background: rgba(26, 26, 46, 0.98); z-index: 2500; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            padding: 20px; box-sizing: border-box;
+        /* 一斉回答 */
+        #simultaneous-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(26, 26, 46, 0.98); z-index: 2500;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
         }
-        
-        #fox-input-v, #fox-input-w, #simul-input { 
-            background: #5a1e23; border: 1px solid #ff6b6b; color: white; width: 80%; 
-            font-size: 1.2rem; margin-bottom: 15px; padding: 15px; border-radius: 5px; 
-        }
-        #simul-input { background: #1a1a2e; border: 1px solid #4CAF50; } /* 一斉回答は緑系 */
-
-        #fox-timer-display { font-size: 3rem; color: #ff6b6b; font-weight: bold; margin: 20px; }
-
-        /* 一斉回答リスト */
-        .simul-list { width: 100%; max-width: 500px; max-height: 70vh; overflow-y: auto; list-style: none; padding: 0; margin-top: 20px;}
+        #simul-input { width: 80%; font-size: 1.2rem; margin: 20px 0; padding: 10px; }
+        .simul-list { width: 100%; max-width: 500px; max-height: 70vh; overflow-y: auto; list-style: none; padding: 0; }
         .simul-item { background: rgba(255,255,255,0.1); margin: 10px; padding: 15px; border-radius: 8px; text-align: left; }
         .simul-name { color: #e94560; font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; }
         .simul-text { font-size: 1.2rem; font-weight: bold; color: #fff; }
 
         .role-wolf { color: #ff6b6b; font-weight: bold; } .role-fox { color: #feca57; font-weight: bold; } .role-villager { color: #1dd1a1; font-weight: bold; }
         .voter-names { font-size: 0.75rem; color: #aaa; display: block; text-align: right; margin-top: 3px; }
-        
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
         .spinner { width: 50px; height: 50px; border: 5px solid rgba(233, 69, 96, 0.3); border-top: 5px solid #e94560; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -103,6 +90,9 @@
         .vote-count { font-size: 1.2rem; font-weight: bold; color: #e94560; }
         .voters-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-top: 5px; }
         .voter-tag { font-size: 0.7rem; background: #333; padding: 2px 6px; border-radius: 4px; color: #aaa; border: 1px solid #555; }
+        
+        /* ★追加: 投票進捗表示用スタイル */
+        #vote-progress-display { font-size: 1.2rem; font-weight: bold; color: #ffd700; margin-bottom: 15px; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); }
     </style>
 </head>
 <body>
@@ -115,19 +105,19 @@
 
     <div id="visual-effect-container"></div>
 
-    <!-- 一斉回答（★修正: アニメーションクラスを変更し、確実に表示されるように調整） -->
-    <div id="simultaneous-overlay" class="hidden animate__animated animate__fadeIn">
+    <!-- 一斉回答 -->
+    <div id="simultaneous-overlay" class="hidden animate__animated animate__fadeInUp">
         <div id="simul-input-area" style="text-align:center; width:100%;">
-            <h2 style="color:#4CAF50; font-size: 2rem;">⚡ 一斉回答チャンス！ ⚡</h2>
-            <p style="color:#ddd; margin-bottom: 20px;">全員の回答が出揃うまで公開されません</p>
-            <input type="text" id="simul-input" placeholder="ここに回答を入力..." autocomplete="off">
-            <button onclick="submitSimulAnswer()" style="background:#4CAF50; font-size:1.2rem; padding:15px; width:80%; margin-top:10px;">送信する</button>
+            <h2 style="color:#4CAF50;">⚡ 一斉回答チャンス！ ⚡</h2>
+            <p>全員の回答が出揃うまで公開されません</p>
+            <input type="text" id="simul-input" placeholder="回答を入力...">
+            <button onclick="submitSimulAnswer()" style="background:#4CAF50; font-size:1.2rem; padding:15px; width:80%;">送信</button>
             <p id="simul-status" style="margin-top:20px; color:#aaa;">待機中...</p>
         </div>
         <div id="simul-result-area" class="hidden" style="text-align:center; width:100%;">
             <h2>📝 全員の回答</h2>
             <ul id="simul-result-list" class="simul-list"></ul>
-            <button onclick="closeSimul()" style="background:#999; margin-top:20px; font-size:1.1rem; padding:10px 30px;">閉じる</button>
+            <button onclick="closeSimul()" style="background:#999; margin-top:20px;">閉じる</button>
         </div>
     </div>
 
@@ -184,7 +174,6 @@
             </div>
         </div>
         
-        <!-- 意味調べボタン（カードの外） -->
         <button class="meaning-btn" onclick="requestWordMeaning()">📖 このワードの意味を調べる</button>
         <div id="meaning-box" class="hidden"></div>
         
@@ -209,24 +198,13 @@
 
     <!-- 4. 投票画面 -->
     <div id="vote-screen" class="box hidden animate__animated animate__fadeInRight">
-        <div class="timer-container" style="background: rgba(255,0,0,0.2);">
-            <div id="vote-timer-display" class="timer-display-text">00:30</div>
-            <div style="font-size:0.8rem; margin-top:5px;">時間切れ注意！</div>
-        </div>
-
         <h2 id="vote-title">👉 追放投票</h2>
         <p id="vote-desc">怪しい人を選んでください</p>
+        
+        <!-- ★追加: 投票進捗の表示 -->
+        <div id="vote-progress-display">投票済: 0 / ?</div>
+
         <div id="vote-buttons"></div>
-    </div>
-    
-    <!-- 狐逆転チャレンジ画面 -->
-    <div id="fox-challenge-overlay" class="hidden animate__animated animate__fadeIn">
-        <h2 style="color:#feca57; text-align:center;">🦊 大逆転チャレンジ！</h2>
-        <p style="color:white;">村と狼、2つのワードを当てろ！</p>
-        <div id="fox-timer-display">60</div>
-        <input type="text" id="fox-input-v" placeholder="村のワードを予想">
-        <input type="text" id="fox-input-w" placeholder="狼のワードを予想">
-        <button onclick="submitFoxGuess()" style="background:#d32f2f; width:80%; margin-top:20px; padding:15px; font-size:1.2rem;">🔥 ファイナルアンサー</button>
     </div>
     
     <!-- 5. 待機画面 -->
@@ -290,7 +268,6 @@
             const sec = (seconds % 60).toString().padStart(2, '0');
             const timeStr = `${min}:${sec}`;
             document.getElementById('timer-display').textContent = timeStr;
-            document.getElementById('vote-timer-display').textContent = timeStr;
         });
 
         function showScreen(id) {
@@ -448,19 +425,18 @@
             if(data.difficulty) changeBackground(data.difficulty);
         });
 
+        // ★追加: 投票進捗の受信
+        socket.on('update_vote_progress', (data) => {
+            const el = document.getElementById('vote-progress-display');
+            if(el) el.textContent = `投票済: ${data.current} / ${data.total}`;
+        });
+
         socket.on('show_voting_screen', (data) => {
             playSound('vote.mp3');
             document.getElementById('loading-overlay').classList.add('hidden');
             showScreen('vote-screen');
             const div = document.getElementById('vote-buttons');
             div.innerHTML = '';
-            
-            if (data.deadFoxId !== socket.id) document.getElementById('fox-challenge-overlay').classList.add('hidden');
-
-            if (data.deadFoxId === socket.id) {
-                div.innerHTML = "<p>あなたは追放されました...<br>逆転のチャンスを待機中...</p>";
-                return; 
-            }
             
             if (data.phase === 'FOX') {
                 document.getElementById('vote-title').textContent = "🦊 1回戦：キツネ投票";
@@ -491,32 +467,6 @@
             if (!hasCandidates) div.innerHTML = "<p style='color:#999;'>投票できる相手がいません</p>";
         });
 
-        socket.on('start_fox_challenge', () => {
-            const overlay = document.getElementById('fox-challenge-overlay');
-            overlay.classList.remove('hidden');
-            let timeLeft = 60;
-            const timerEl = document.getElementById('fox-timer-display');
-            timerEl.textContent = timeLeft;
-            clearInterval(foxTimerInterval);
-            foxTimerInterval = setInterval(() => {
-                timeLeft--;
-                timerEl.textContent = timeLeft;
-                if(timeLeft <= 0) clearInterval(foxTimerInterval);
-            }, 1000);
-        });
-
-        function submitFoxGuess() {
-            const vGuess = document.getElementById('fox-input-v').value;
-            const wGuess = document.getElementById('fox-input-w').value;
-            if(!vGuess || !wGuess) return alert("両方のワードを入力してください");
-            socket.emit('submit_fox_guess', { vGuess, wGuess });
-        }
-        
-        socket.on('fox_challenge_failed', () => {
-            alert("不正解...！運命は狼投票に委ねられました。");
-            document.getElementById('fox-challenge-overlay').innerHTML = "<h2>不正解...</h2><p>結果を待ちましょう。</p>";
-        });
-
         socket.on('fox_caught', (data) => {
             playSound('caught.mp3');
             showScreen('fox-caught-screen');
@@ -525,11 +475,7 @@
 
         socket.on('game_result', (data) => {
             playSound('result.mp3');
-            clearInterval(foxTimerInterval);
-            document.getElementById('fox-challenge-overlay').classList.add('hidden'); 
-            document.getElementById('simultaneous-overlay').classList.add('hidden');
             showScreen('result-screen');
-            
             const ul = document.getElementById('result-list');
             const title = document.getElementById('winner-title');
             const msg = document.getElementById('result-message');
