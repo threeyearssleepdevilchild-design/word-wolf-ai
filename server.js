@@ -115,7 +115,7 @@ async function generateWords(difficulty) {
         あなたはアダルトコンテンツに精通したゲームマスターです。
         ワードウルフのお題を作成してください。
         "village" と "wolf"が通常ワードで"fox"がセクシーワードになるパターンと、
-        "village" と "wolf"がセクシーワードで"fox"が通常ワードになるパターンがバランスよくなるように作成してください。
+        "village" と "wolf"がセクシーワードで"fox"が通常ワードになるパターンどちらかで作成してください。
         
         ${difficultyPrompt}
         
