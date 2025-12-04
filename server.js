@@ -114,8 +114,8 @@ async function generateWords(difficulty) {
     const prompt = `
         あなたはアダルトコンテンツに精通したゲームマスターです。
         ワードウルフのお題を作成してください。
-        "village" と "wolf"が通常ワードで"fox"がセクシーワードになるパターンと、
-        "village" と "wolf"がセクシーワードで"fox"が通常ワードになるパターンどちらかで作成してください。
+        "village" と "wolf"が通常ワードで"fox"がアダルトワードになるパターンと、
+        "village" と "wolf"がアダルトワードで"fox"が通常ワードになるパターンどちらかで作成してください。
         
         ${difficultyPrompt}
         
@@ -130,7 +130,7 @@ async function generateWords(difficulty) {
            - 日本語と英語に訳しただけのワード（例：電マとワンドマッサージャー）は禁止。
 
         2. "fox" (第三勢力) :
-           - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**で会話に参加できる**「大きな共通点」を持たせないこと。**
+           - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**で、会話に参加できる**「大きな共通点」を持たせないこと。**
            - **絶対にvillage/wolfと同ジャンル（例：全員食べ物、全員性具）にしてはいけない。**
 
         ${examples}
