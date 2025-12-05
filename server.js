@@ -114,8 +114,6 @@ async function generateWords(difficulty) {
     const prompt = `
         あなたはアダルトコンテンツに精通したゲームマスターです。
         ワードウルフのお題を作成してください。
-        "village" と "wolf"が通常ワードで"fox"がアダルトワードになるパターンと、
-        "village" と "wolf"がアダルトワードで"fox"が通常ワードになるパターンどちらかで作成してください。
         
         ${difficultyPrompt}
         
