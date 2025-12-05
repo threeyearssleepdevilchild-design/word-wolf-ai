@@ -365,7 +365,7 @@ io.on('connection', (socket) => {
         deadFoxId = null;
         simultaneousAnswers = [];
         
-        const discussionTime = players.length * 180; // 3分
+        const discussionTime = players.length * 150; // 3分
         startServerTimer(discussionTime, true);
 
         players.forEach(p => { 
