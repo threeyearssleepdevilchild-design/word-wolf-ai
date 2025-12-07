@@ -119,7 +119,7 @@ async function generateWords(difficulty) {
         console.log(`🤖 AI Request (Mode: ${difficulty}, Pivot: ${pivotRole}) sending...`);
         
         // ★修正ポイント: モデル名を gemini-2.5-flash に戻しました！
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -174,12 +174,12 @@ async function generateWords(difficulty) {
 async function generateAiQuestions(word) {
     if (!apiKey) return ["質問案1", "質問案2", "質問案3"];
     const prompt = `
-        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を3つ考えて。
+        ワードウルフ「${word}」について、バレないような当たり障りのない簡素な質問を7つ考えて。
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
         // ★修正ポイント: gemini-2.5-flash
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -197,11 +197,11 @@ async function generateAiQuestions(word) {
 async function generateWordMeaning(word) {
     if (!apiKey) return "APIキー設定なし";
     const prompt = `
-        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、簡潔に説明してください。
+        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーが意味を確認できるよう、簡潔に説明してください。
     `;
     try {
         // ★修正ポイント: gemini-2.5-flash
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
