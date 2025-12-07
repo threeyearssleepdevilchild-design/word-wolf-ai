@@ -35,7 +35,7 @@ let timer = {
     intervalId: null
 };
 
-// 安全設定：BLOCK_NONEで最大限緩める
+// 安全設定
 const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -118,8 +118,8 @@ async function generateWords(difficulty) {
     try {
         console.log(`🤖 AI Request (Mode: ${difficulty}, Pivot: ${pivotRole}) sending...`);
         
-        // ★修正ポイント: モデル名を gemini-1.5-flash-latest に変更
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+        // ★修正ポイント: モデル名を gemini-2.5-flash に戻しました！
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -150,7 +150,6 @@ async function generateWords(difficulty) {
         let text = data.candidates[0].content.parts[0].text;
         console.log(`🤖 AI Response received: ${text.substring(0, 50)}...`);
 
-        // JSONパース
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(text);
 
@@ -179,8 +178,8 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        // ★修正ポイント
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+        // ★修正ポイント: gemini-2.5-flash
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -201,8 +200,8 @@ async function generateWordMeaning(word) {
         単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、簡潔に説明してください。
     `;
     try {
-        // ★修正ポイント
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+        // ★修正ポイント: gemini-2.5-flash
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
