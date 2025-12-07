@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
-// APIキーの読み込みチェック（ログで確認用、キーの中身は隠す）
+// APIキーの読み込みチェック
 const rawApiKey = process.env.GEMINI_API_KEY || "";
 const apiKey = rawApiKey.trim(); 
 if(apiKey) {
@@ -27,9 +27,6 @@ let deadFoxId = null;
 let currentDifficulty = 'sexy';
 let currentWolfCount = 1;
 
-// 履歴機能は一旦無効化（エラー回避のため）
-// let usedWordsHistory = []; 
-
 const aiCooldowns = new Map();
 
 let timer = {
@@ -38,7 +35,7 @@ let timer = {
     intervalId: null
 };
 
-// 安全設定：BLOCK_NONEでも弾かれることはあるが、最大限緩める
+// 安全設定：BLOCK_NONEで最大限緩める
 const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -55,7 +52,7 @@ function shuffleArray(array) {
 }
 
 async function generateWords(difficulty) {
-    const fallback = { village: "バイブ", wolf: "ローター", fox: "指", reason: "予備データ(APIエラーまたは設定ミス)" };
+    const fallback = { village: "バイブ", wolf: "ローター", fox: "指", reason: "予備データ(APIエラー)" };
     
     if (!apiKey) {
         console.error("Attempted to generate words but API Key is missing.");
@@ -121,15 +118,15 @@ async function generateWords(difficulty) {
     try {
         console.log(`🤖 AI Request (Mode: ${difficulty}, Pivot: ${pivotRole}) sending...`);
         
-        // ★重要: gemini-1.5-flash を使い、responseMimeType: "application/json" を指定
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // ★修正ポイント: モデル名を gemini-1.5-flash-latest に変更
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: { 
                     temperature: 1.2,
-                    responseMimeType: "application/json" // ★これで強制的にJSONを返させる
+                    responseMimeType: "application/json" // JSON強制
                 },
                 safetySettings: SAFETY_SETTINGS
             })
@@ -153,7 +150,7 @@ async function generateWords(difficulty) {
         let text = data.candidates[0].content.parts[0].text;
         console.log(`🤖 AI Response received: ${text.substring(0, 50)}...`);
 
-        // JSONパース（念のためテキストクリーニングを入れる）
+        // JSONパース
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(text);
 
@@ -182,12 +179,13 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // ★修正ポイント
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json" }, // JSON強制
+                generationConfig: { responseMimeType: "application/json" }, 
                 safetySettings: SAFETY_SETTINGS
             })
         });
@@ -203,7 +201,8 @@ async function generateWordMeaning(word) {
         単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、簡潔に説明してください。
     `;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // ★修正ポイント
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
