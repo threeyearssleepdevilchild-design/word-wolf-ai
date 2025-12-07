@@ -50,30 +50,25 @@ async function generateWords(difficulty) {
     const fallback = { village: "バイブ", wolf: "ローター", fox: "指", reason: "予備データ" };
     if (!apiKey) return fallback;
 
+    // ★改善: 生成の起点をランダムにする（マンネリ防止）
+    // village: 村人(多数)起点, wolf: 人狼(少数)起点, fox: キツネ(別枠)起点
+    const pivotRoll = Math.random();
+    let pivotRole = 'village'; 
+    if (pivotRoll < 0.3) pivotRole = 'wolf'; // 30%の確率で人狼起点
+    else if (pivotRoll < 0.45) pivotRole = 'fox'; // 15%の確率でキツネ起点
+
     let subTheme = "";
     let difficultyPrompt = "";
     let examples = "";
 
     if (difficulty === 'sexy') {
         const sexySubThemes = [
-            "下着・ランジェリー・勝負服",
-            "大人の道具・おもちゃ",
-            "夜のテクニック・体位",
-            "興奮するシチュエーション・場所",
-            "身体の部位（胸・尻など）・フェチ（匂いなど）",
-            "コスプレ・ロールプレイ",
-            "Sっ気・Mっ気・攻めと受け・痴女",
-            "ギリギリのライン（露出・スリル）",
-            "浮気・不倫・修羅場・寝取られ",
-            "挿入する道具（バイブ・ディルド・張形）",
-            "責める道具（ローター・電マ・クリップ）",
-            "SM・拘束・責め苦（鞭・蝋燭・手錠）",
-            "具体的な体位・プレイ（騎乗位・バック・対面座位）",
-            "口や舌を使う行為（フェラ・クンニ・69）",
-            "汁・分泌液（精液・潮・愛液・唾液）",
-            "NTR・不倫・竿姉妹・穴兄弟",
-            "アナル・浣腸・放尿",
-            "露出・痴漢・のぞき・ハプニング"
+            "下着・ランジェリー・勝負服", "大人の道具・おもちゃ", "夜のテクニック・体位",
+            "興奮するシチュエーション・場所", "身体の部位（胸・尻など）・フェチ",
+            "コスプレ・ロールプレイ", "Sっ気・Mっ気・攻めと受け", "ギリギリのライン（露出・スリル）",
+            "浮気・不倫・修羅場", "挿入する道具", "責める道具", "SM・拘束・責め苦",
+            "具体的な体位・プレイ", "口や舌を使う行為", "汁・分泌液", "NTR・寝取られ",
+            "アナル・浣腸・排泄関連", "露出・痴漢・のぞき"
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
         
@@ -82,26 +77,6 @@ async function generateWords(difficulty) {
             サブテーマ: 【${subTheme}】
             条件: 恥ずかしがらず、具体的で露骨な単語を選ぶこと。抽象的な言葉は禁止。
         `;
-
-        examples = `
-            【良い生成例 1 (テーマ: 食べ物)】
-            village: "そば", wolf: "白米" (※食べ物つながり)
-            fox: "自動車" (※全く違うジャンルだが、日常生活にある共通点)
-
-            【良い生成例 2 (テーマ: 星)】
-            village: "地球", wolf: "火星" (※同じ惑星)
-            fox: "オットセイ" (※全く違う生物)
-
-            【悪い生成例 (絶対避けること)】
-            village: "そば", wolf: "うどん", fox: "白米" 
-            (※理由: 全て食べ物でジャンルが被っているためNG)
-
-            【今回のセクシーモードでの適用イメージ】
-            village: "バイブ" (性具)
-            wolf: "ローター" (性具)
-            fox: "原子力発電所" (※かすりもしない全く違うもの)
-        `;
-
     } else {
         let diffText = "一般向け";
         if (difficulty === 'easy') diffText = "子供向け（具体的）";
@@ -115,6 +90,11 @@ async function generateWords(difficulty) {
         あなたはアダルトコンテンツに精通したゲームマスターです。
         ワードウルフのお題を作成してください。
         
+        今回の生成手順:
+        1. まず【${pivotRole}】の単語を最初に決めてください。
+        2. その単語を基準にして、残りの役割の単語を決めてください。
+           (VillageとWolfは酷似させる、Foxはカテゴリーを変える)
+
         ${difficultyPrompt}
         
         【重要：禁止ワード】
@@ -122,16 +102,15 @@ async function generateWords(difficulty) {
         
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **機能・形状・ジャンルが30%一致する酷似した単語**。
+           - **機能・形状・ジャンルが50%一致する酷似した単語**。
            - 議論しないと見分けがつかないレベル。
            - 包含関係（例：ビールと生ビール）は禁止。
-           - 日本語と英語に訳しただけのワード（例：電マとワンドマッサージャー）は禁止。
+           - 日本語と英語に訳しただけのワードは禁止。
 
         2. "fox" (第三勢力) :
-           - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**で、会話に参加できる**「大きな共通点」を持たせないこと。**
+           - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**。
+           - 会話に参加できる「大きな共通点」を持たせないこと。
            - **絶対にvillage/wolfと同ジャンル（例：全員食べ物、全員性具）にしてはいけない。**
-
-        ${examples}
         
         【出力形式】
         JSON形式のみ出力(マークダウン禁止)。
@@ -139,7 +118,7 @@ async function generateWords(difficulty) {
     `;
 
     try {
-        console.log(`AIリクエスト(Mode: ${difficulty})...`);
+        console.log(`AIリクエスト(Mode: ${difficulty}, Pivot: ${pivotRole})...`);
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -195,8 +174,7 @@ async function generateAiQuestions(word) {
 async function generateWordMeaning(word) {
     if (!apiKey) return "APIキーが設定されていません。";
     const prompt = `
-        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、簡潔に説明してください。
-
+        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤー意味を確認できるよう、簡潔に説明してください。
     `;
     try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
@@ -210,7 +188,9 @@ async function generateWordMeaning(word) {
 }
 
 function calculateVoteResult() {
-    const sorted = [...players].sort((a, b) => b.voteCount - a.voteCount);
+    // deadFoxIdの人は投票対象外になっているはずだが、念のため除外して計算
+    const validPlayers = players.filter(p => p.id !== deadFoxId);
+    const sorted = [...validPlayers].sort((a, b) => b.voteCount - a.voteCount);
     const maxVotes = sorted[0].voteCount;
     const candidates = sorted.filter(p => p.voteCount === maxVotes);
     return candidates[Math.floor(Math.random() * candidates.length)];
@@ -237,11 +217,12 @@ function startServerTimer(duration, autoStart = true) {
     }
 }
 
-// ★追加：投票状況の配信
 function broadcastVoteProgress() {
+    // 投票権を持つ人の総数（死んだキツネは投票権なし）
     let eligibleVoters = players.length;
     if (deadFoxId) eligibleVoters -= 1;
-    // 全員に「現在X人 / 全Y人」を送る
+    
+    // 現在接続している投票権者の数に補正してもよいが、ここでは単純に登録者数ベースで表示
     io.emit('update_vote_progress', { current: votesReceived, total: eligibleVoters });
 }
 
@@ -252,14 +233,13 @@ function initiateVotingPhase() {
     votesReceived = 0;
     gameState = 'VOTING_FOX';
     io.emit('show_voting_screen', { players, phase: 'FOX', deadFoxId: null });
-    broadcastVoteProgress(); // 初期状態配信
+    broadcastVoteProgress();
 }
 
 function checkVotingCompletion() {
     let eligibleVoters = players.length;
     if (deadFoxId) eligibleVoters -= 1;
 
-    // 投票があるたびに進捗を配信
     broadcastVoteProgress();
 
     if (votesReceived >= eligibleVoters) {
@@ -267,10 +247,11 @@ function checkVotingCompletion() {
         
         if (gameState === 'VOTING_FOX') {
             if (victim.role === 'fox') {
+                // キツネ確保 -> 逆転無しでそのまま人狼投票へ
                 deadFoxId = victim.id; 
                 io.emit('fox_caught', { victimName: victim.name });
-                // ★変更: 逆転チャレンジ削除 -> そのまま待機して狼投票へ
                 
+                // 4秒後に人狼投票へ
                 setTimeout(() => {
                     gameState = 'VOTING_WOLF';
                     votesReceived = 0;
@@ -279,10 +260,12 @@ function checkVotingCompletion() {
                         p.voters = []; 
                         p.status.hasVoted = false; 
                     });
+                    // 死んだキツネは投票対象外として渡す
                     io.emit('show_voting_screen', { players, phase: 'WOLF', deadFoxId: deadFoxId });
-                    broadcastVoteProgress(); // 初期状態配信
+                    broadcastVoteProgress(); 
                 }, 4000); 
             } else {
+                // キツネ勝利
                 gameState = 'RESULT';
                 io.emit('game_result', { players, winner: 'FOX', victimName: victim.name, reason: currentWords.reason });
             }
@@ -320,8 +303,8 @@ io.on('connection', (socket) => {
                 socket.emit('game_started', { word: existing.word, difficulty: currentDifficulty });
                 socket.emit('update_game_status', players); 
                 if(gameState.startsWith('VOTING')) {
-                    socket.emit('show_voting_screen', { players, phase: gameState, deadFoxId });
-                    broadcastVoteProgress(); // 途中参加者用
+                    socket.emit('show_voting_screen', { players, phase: gameState.includes('WOLF') ? 'WOLF' : 'FOX', deadFoxId });
+                    broadcastVoteProgress();
                 }
                 if(gameState === 'RESULT') socket.emit('game_result', { players, winner: 'unknown', reason: currentWords.reason });
                 io.emit('update_players', players);
@@ -365,7 +348,7 @@ io.on('connection', (socket) => {
         deadFoxId = null;
         simultaneousAnswers = [];
         
-        const discussionTime = players.length * 150; // 3分
+        const discussionTime = players.length * 150; 
         startServerTimer(discussionTime, true);
 
         players.forEach(p => { 
@@ -437,14 +420,21 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ★修正: 一斉回答の判定ロジック
     socket.on('submit_simultaneous_answer', (answerText) => {
         const player = players.find(p => p.id === socket.id);
         if (!player) return;
         const existing = simultaneousAnswers.find(a => a.id === socket.id);
         if (existing) { existing.text = answerText; } 
         else { simultaneousAnswers.push({ id: socket.id, name: player.name, text: answerText }); }
-        io.emit('update_simultaneous_progress', simultaneousAnswers.length, players.length);
-        if (simultaneousAnswers.length >= players.length) {
+        
+        // 現在接続中のプレイヤー（アクティブな人）だけを分母にする
+        const activePlayers = players.filter(p => io.sockets.sockets.has(p.id));
+        const activeCount = activePlayers.length;
+
+        io.emit('update_simultaneous_progress', simultaneousAnswers.length, activeCount);
+        
+        if (simultaneousAnswers.length >= activeCount) {
             io.emit('reveal_simultaneous_answers', simultaneousAnswers);
         }
     });
@@ -456,7 +446,7 @@ io.on('connection', (socket) => {
     socket.on('submit_vote', ({ targetId, voterId }) => {
         const target = players.find(p => p.id === targetId);
         const voter = players.find(p => p.id === voterId);
-        if (voterId === deadFoxId) return;
+        if (voterId === deadFoxId) return; // 死んだキツネは投票できない
         if (!voter || voter.status.hasVoted) return; 
 
         if(target) { 
@@ -492,11 +482,14 @@ io.on('connection', (socket) => {
             io.emit('update_players', players);
         } else if (gameState.startsWith('VOTING')) {
             const leaver = players.find(p => p.id === socket.id);
-            if(leaver && !leaver.status.hasVoted) {
+            if(leaver && !leaver.status.hasVoted && leaver.id !== deadFoxId) {
+                // 投票フェーズで未投票のまま抜けた場合、人数合わせのためにプレイヤーリストから削除
+                // （ただしゲーム進行が狂う可能性はあるが、詰まるよりマシ）
                 players = players.filter(p => p.id !== socket.id);
                 checkVotingCompletion();
             }
         }
+        // PLAYING中はリストから消さない（再接続対応のため）が、一斉回答ロジックでは除外される
     });
 });
 
