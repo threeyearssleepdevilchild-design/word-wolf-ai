@@ -8,20 +8,27 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
+// APIキーの読み込みチェック（ログで確認用、キーの中身は隠す）
 const rawApiKey = process.env.GEMINI_API_KEY || "";
 const apiKey = rawApiKey.trim(); 
-if(apiKey) console.log(`API Key set: ${apiKey.substring(0,3)}...`);
+if(apiKey) {
+    console.log(`✅ API Key is set (Length: ${apiKey.length})`);
+} else {
+    console.error(`❌ API Key is MISSING! Please set GEMINI_API_KEY in environment variables.`);
+}
 
 app.use(express.static('public'));
 
 let players = []; 
 let gameState = 'WAITING'; 
 let votesReceived = 0; 
-let usedWordsHistory = []; 
 let currentWords = { village: "", wolf: "", fox: "", reason: "" };
 let deadFoxId = null;
 let currentDifficulty = 'sexy';
 let currentWolfCount = 1;
+
+// 履歴機能は一旦無効化（エラー回避のため）
+// let usedWordsHistory = []; 
 
 const aiCooldowns = new Map();
 
@@ -31,7 +38,7 @@ let timer = {
     intervalId: null
 };
 
-// 安全設定：できるだけブロックしない設定にするが、入力プロンプト次第では弾かれることがある
+// 安全設定：BLOCK_NONEでも弾かれることはあるが、最大限緩める
 const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -48,8 +55,12 @@ function shuffleArray(array) {
 }
 
 async function generateWords(difficulty) {
-    const fallback = { village: "バイブ", wolf: "ローター", fox: "指", reason: "予備データ(AI生成失敗)" };
-    if (!apiKey) return fallback;
+    const fallback = { village: "バイブ", wolf: "ローター", fox: "指", reason: "予備データ(APIエラーまたは設定ミス)" };
+    
+    if (!apiKey) {
+        console.error("Attempted to generate words but API Key is missing.");
+        return fallback;
+    }
 
     // 起点をランダムにする
     const pivotRoll = Math.random();
@@ -83,10 +94,6 @@ async function generateWords(difficulty) {
         difficultyPrompt = `ターゲット: ${diffText}`;
     }
 
-    // ★修正: 履歴が過激な単語を含むと、入力フィルターで弾かれるため、プロンプトには含めないことにします。
-    // const bannedWords = usedWordsHistory.join(", "); 
-    const bannedWords = ""; // 無効化
-
     const prompt = `
         あなたはワードウルフのゲームマスターです。お題を作成してください。
         
@@ -107,39 +114,47 @@ async function generateWords(difficulty) {
            - 絶対にvillage/wolfと同ジャンルにしてはいけない。
         
         【出力形式】
-        JSON形式のみ出力(マークダウン禁止)。
+        JSON形式のみ出力。余計なマークダウンや会話は不要。
         { "village":"...", "wolf":"...", "fox":"...", "reason":"選定理由" }
     `;
 
     try {
-        console.log(`AIリクエスト(Mode: ${difficulty}, Pivot: ${pivotRole})...`);
+        console.log(`🤖 AI Request (Mode: ${difficulty}, Pivot: ${pivotRole}) sending...`);
         
-        // ★修正: モデル名を安定版の gemini-1.5-flash に変更（2.5等は環境により不安定なため）
+        // ★重要: gemini-1.5-flash を使い、responseMimeType: "application/json" を指定
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 1.2 },
+                generationConfig: { 
+                    temperature: 1.2,
+                    responseMimeType: "application/json" // ★これで強制的にJSONを返させる
+                },
                 safetySettings: SAFETY_SETTINGS
             })
         });
 
         if (!response.ok) {
-            console.error(`Gemini API Error: ${response.status} ${response.statusText}`);
+            console.error(`🚨 API HTTP Error: ${response.status} ${response.statusText}`);
+            const errorText = await response.text();
+            console.error(`Error Body: ${errorText}`);
             throw new Error(response.status);
         }
         
         const data = await response.json();
         
-        // 候補がない（ブロックされた）場合のチェック
         if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-            console.error("Gemini API Blocked the response (Safety Filter).");
-            console.log(JSON.stringify(data)); // デバッグ用詳細
+            console.error("🚨 API blocked the content (Safety Filter or No Candidates).");
+            console.log("Full Response:", JSON.stringify(data));
             return fallback;
         }
 
-        let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+        let text = data.candidates[0].content.parts[0].text;
+        console.log(`🤖 AI Response received: ${text.substring(0, 50)}...`);
+
+        // JSONパース（念のためテキストクリーニングを入れる）
+        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(text);
 
         const v = json.village || json.Village;
@@ -147,18 +162,15 @@ async function generateWords(difficulty) {
         const f = json.fox || json.Fox;
         const r = json.reason || json.Reason || "";
 
-        if (!v || !w || !f) return fallback;
-
-        // 履歴には追加するが、次回のプロンプトには使わない運用にする
-        usedWordsHistory.push(v, w, f);
-        if (usedWordsHistory.length > 150) {
-            usedWordsHistory = usedWordsHistory.slice(-150);
+        if (!v || !w || !f) {
+            console.error("🚨 JSON parsed but missing fields:", json);
+            return fallback;
         }
 
         return { village: v, wolf: w, fox: f, reason: r };
 
     } catch (e) { 
-        console.error("Generate Words Error:", e); 
+        console.error("🚨 Generate Words EXCEPTION:", e); 
         return fallback; 
     }
 }
@@ -173,7 +185,11 @@ async function generateAiQuestions(word) {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }, // JSON強制
+                safetySettings: SAFETY_SETTINGS
+            })
         });
         const data = await response.json();
         let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -182,7 +198,7 @@ async function generateAiQuestions(word) {
 }
 
 async function generateWordMeaning(word) {
-    if (!apiKey) return "APIキーが設定されていません。";
+    if (!apiKey) return "APIキー設定なし";
     const prompt = `
         単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、簡潔に説明してください。
     `;
@@ -199,6 +215,8 @@ async function generateWordMeaning(word) {
 
 function calculateVoteResult() {
     const validPlayers = players.filter(p => p.id !== deadFoxId);
+    if(validPlayers.length === 0) return { role: 'none', name: 'none' };
+    
     const sorted = [...validPlayers].sort((a, b) => b.voteCount - a.voteCount);
     const maxVotes = sorted[0].voteCount;
     const candidates = sorted.filter(p => p.voteCount === maxVotes);
