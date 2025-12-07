@@ -31,6 +31,7 @@ let timer = {
     intervalId: null
 };
 
+// 安全設定：できるだけブロックしない設定にするが、入力プロンプト次第では弾かれることがある
 const SAFETY_SETTINGS = [
     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -47,28 +48,26 @@ function shuffleArray(array) {
 }
 
 async function generateWords(difficulty) {
-    const fallback = { village: "バイブ", wolf: "ローター", fox: "指", reason: "予備データ" };
+    const fallback = { village: "バイブ", wolf: "ローター", fox: "指", reason: "予備データ(AI生成失敗)" };
     if (!apiKey) return fallback;
 
-    // ★改善: 生成の起点をランダムにする（マンネリ防止）
-    // village: 村人(多数)起点, wolf: 人狼(少数)起点, fox: キツネ(別枠)起点
+    // 起点をランダムにする
     const pivotRoll = Math.random();
     let pivotRole = 'village'; 
-    if (pivotRoll < 0.3) pivotRole = 'wolf'; // 30%の確率で人狼起点
-    else if (pivotRoll < 0.45) pivotRole = 'fox'; // 15%の確率でキツネ起点
+    if (pivotRoll < 0.3) pivotRole = 'wolf'; 
+    else if (pivotRoll < 0.45) pivotRole = 'fox'; 
 
     let subTheme = "";
     let difficultyPrompt = "";
-    let examples = "";
 
     if (difficulty === 'sexy') {
         const sexySubThemes = [
-            "下着・ランジェリー・勝負服", "大人の道具・おもちゃ", "夜のテクニック・体位",
-            "興奮するシチュエーション・場所", "身体の部位（胸・尻など）・フェチ",
-            "コスプレ・ロールプレイ", "Sっ気・Mっ気・攻めと受け", "ギリギリのライン（露出・スリル）",
-            "浮気・不倫・修羅場", "挿入する道具", "責める道具", "SM・拘束・責め苦",
-            "具体的な体位・プレイ", "口や舌を使う行為", "汁・分泌液", "NTR・寝取られ",
-            "アナル・浣腸・排泄関連", "露出・痴漢・のぞき"
+            "下着・ランジェリー", "大人の道具・おもちゃ", "夜のテクニック・体位",
+            "シチュエーション・場所", "身体の部位・フェチ",
+            "コスプレ・ロールプレイ", "SとM・攻めと受け", "スリル・露出",
+            "浮気・不倫", "挿入する道具", "責める道具", "SM・拘束",
+            "具体的なプレイ", "口や舌を使う行為", "汁・分泌液", "NTR・寝取られ",
+            "排泄関連", "ハプニング・のぞき"
         ];
         subTheme = sexySubThemes[Math.floor(Math.random() * sexySubThemes.length)];
         
@@ -84,42 +83,39 @@ async function generateWords(difficulty) {
         difficultyPrompt = `ターゲット: ${diffText}`;
     }
 
-    const bannedWords = usedWordsHistory.join(", ");
+    // ★修正: 履歴が過激な単語を含むと、入力フィルターで弾かれるため、プロンプトには含めないことにします。
+    // const bannedWords = usedWordsHistory.join(", "); 
+    const bannedWords = ""; // 無効化
 
     const prompt = `
-        あなたはアダルトコンテンツに精通したゲームマスターです。
-        ワードウルフのお題を作成してください。
+        あなたはワードウルフのゲームマスターです。お題を作成してください。
         
-        今回の生成手順:
+        生成手順:
         1. まず【${pivotRole}】の単語を最初に決めてください。
         2. その単語を基準にして、残りの役割の単語を決めてください。
-           (VillageとWolfは酷似させる、Foxはカテゴリーを変える)
 
         ${difficultyPrompt}
         
-        【重要：禁止ワード】
-        [ ${bannedWords} ]
-        
         【ワードの3すくみ関係（絶対厳守）】
         1. "village" (多数派) と "wolf" (少数派) :
-           - **機能・形状・ジャンルが50%一致する酷似した単語**。
+           - **機能・形状・ジャンルが30%一致する酷似した単語**。
            - 議論しないと見分けがつかないレベル。
            - 包含関係（例：ビールと生ビール）は禁止。
-           - 日本語と英語に訳しただけのワードは禁止。
 
         2. "fox" (第三勢力) :
            - village/wolfとは**「カテゴリー」や「用途」が決定的に違う単語**。
-           - 会話に参加できる「大きな共通点」を持たせないこと。
-           - **絶対にvillage/wolfと同ジャンル（例：全員食べ物、全員性具）にしてはいけない。**
+           - 絶対にvillage/wolfと同ジャンルにしてはいけない。
         
         【出力形式】
         JSON形式のみ出力(マークダウン禁止)。
-        { "village":"...", "wolf":"...", "fox":"...", "reason":"選定理由の解説" }
+        { "village":"...", "wolf":"...", "fox":"...", "reason":"選定理由" }
     `;
 
     try {
         console.log(`AIリクエスト(Mode: ${difficulty}, Pivot: ${pivotRole})...`);
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        
+        // ★修正: モデル名を安定版の gemini-1.5-flash に変更（2.5等は環境により不安定なため）
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -129,9 +125,19 @@ async function generateWords(difficulty) {
             })
         });
 
-        if (!response.ok) throw new Error(response.status);
+        if (!response.ok) {
+            console.error(`Gemini API Error: ${response.status} ${response.statusText}`);
+            throw new Error(response.status);
+        }
+        
         const data = await response.json();
-        if (!data.candidates || !data.candidates[0]) return fallback;
+        
+        // 候補がない（ブロックされた）場合のチェック
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+            console.error("Gemini API Blocked the response (Safety Filter).");
+            console.log(JSON.stringify(data)); // デバッグ用詳細
+            return fallback;
+        }
 
         let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(text);
@@ -143,6 +149,7 @@ async function generateWords(difficulty) {
 
         if (!v || !w || !f) return fallback;
 
+        // 履歴には追加するが、次回のプロンプトには使わない運用にする
         usedWordsHistory.push(v, w, f);
         if (usedWordsHistory.length > 150) {
             usedWordsHistory = usedWordsHistory.slice(-150);
@@ -150,7 +157,10 @@ async function generateWords(difficulty) {
 
         return { village: v, wolf: w, fox: f, reason: r };
 
-    } catch (e) { console.error(e); return fallback; }
+    } catch (e) { 
+        console.error("Generate Words Error:", e); 
+        return fallback; 
+    }
 }
 
 async function generateAiQuestions(word) {
@@ -160,7 +170,7 @@ async function generateAiQuestions(word) {
         出力: JSON配列 ["質問1", "質問2", "質問3"]
     `;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
@@ -174,10 +184,10 @@ async function generateAiQuestions(word) {
 async function generateWordMeaning(word) {
     if (!apiKey) return "APIキーが設定されていません。";
     const prompt = `
-        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤー意味を確認できるよう、簡潔に説明してください。
+        単語「${word}」の意味を、ワードウルフのゲーム中にプレイヤーがこっそり確認できるよう、簡潔に説明してください。
     `;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
@@ -188,7 +198,6 @@ async function generateWordMeaning(word) {
 }
 
 function calculateVoteResult() {
-    // deadFoxIdの人は投票対象外になっているはずだが、念のため除外して計算
     const validPlayers = players.filter(p => p.id !== deadFoxId);
     const sorted = [...validPlayers].sort((a, b) => b.voteCount - a.voteCount);
     const maxVotes = sorted[0].voteCount;
@@ -218,11 +227,8 @@ function startServerTimer(duration, autoStart = true) {
 }
 
 function broadcastVoteProgress() {
-    // 投票権を持つ人の総数（死んだキツネは投票権なし）
     let eligibleVoters = players.length;
     if (deadFoxId) eligibleVoters -= 1;
-    
-    // 現在接続している投票権者の数に補正してもよいが、ここでは単純に登録者数ベースで表示
     io.emit('update_vote_progress', { current: votesReceived, total: eligibleVoters });
 }
 
@@ -247,11 +253,8 @@ function checkVotingCompletion() {
         
         if (gameState === 'VOTING_FOX') {
             if (victim.role === 'fox') {
-                // キツネ確保 -> 逆転無しでそのまま人狼投票へ
                 deadFoxId = victim.id; 
                 io.emit('fox_caught', { victimName: victim.name });
-                
-                // 4秒後に人狼投票へ
                 setTimeout(() => {
                     gameState = 'VOTING_WOLF';
                     votesReceived = 0;
@@ -260,12 +263,10 @@ function checkVotingCompletion() {
                         p.voters = []; 
                         p.status.hasVoted = false; 
                     });
-                    // 死んだキツネは投票対象外として渡す
                     io.emit('show_voting_screen', { players, phase: 'WOLF', deadFoxId: deadFoxId });
                     broadcastVoteProgress(); 
                 }, 4000); 
             } else {
-                // キツネ勝利
                 gameState = 'RESULT';
                 io.emit('game_result', { players, winner: 'FOX', victimName: victim.name, reason: currentWords.reason });
             }
@@ -420,7 +421,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ★修正: 一斉回答の判定ロジック
     socket.on('submit_simultaneous_answer', (answerText) => {
         const player = players.find(p => p.id === socket.id);
         if (!player) return;
@@ -428,7 +428,6 @@ io.on('connection', (socket) => {
         if (existing) { existing.text = answerText; } 
         else { simultaneousAnswers.push({ id: socket.id, name: player.name, text: answerText }); }
         
-        // 現在接続中のプレイヤー（アクティブな人）だけを分母にする
         const activePlayers = players.filter(p => io.sockets.sockets.has(p.id));
         const activeCount = activePlayers.length;
 
@@ -446,7 +445,7 @@ io.on('connection', (socket) => {
     socket.on('submit_vote', ({ targetId, voterId }) => {
         const target = players.find(p => p.id === targetId);
         const voter = players.find(p => p.id === voterId);
-        if (voterId === deadFoxId) return; // 死んだキツネは投票できない
+        if (voterId === deadFoxId) return;
         if (!voter || voter.status.hasVoted) return; 
 
         if(target) { 
@@ -483,13 +482,10 @@ io.on('connection', (socket) => {
         } else if (gameState.startsWith('VOTING')) {
             const leaver = players.find(p => p.id === socket.id);
             if(leaver && !leaver.status.hasVoted && leaver.id !== deadFoxId) {
-                // 投票フェーズで未投票のまま抜けた場合、人数合わせのためにプレイヤーリストから削除
-                // （ただしゲーム進行が狂う可能性はあるが、詰まるよりマシ）
                 players = players.filter(p => p.id !== socket.id);
                 checkVotingCompletion();
             }
         }
-        // PLAYING中はリストから消さない（再接続対応のため）が、一斉回答ロジックでは除外される
     });
 });
 
