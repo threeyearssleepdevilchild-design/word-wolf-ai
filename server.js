@@ -119,7 +119,7 @@ async function generateWords(difficulty) {
         console.log(`🤖 AI Request (Mode: ${difficulty}, Pivot: ${pivotRole}) sending...`);
         
         // ★修正ポイント: モデル名を gemini-1.5-flash-latest に変更
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -180,7 +180,7 @@ async function generateAiQuestions(word) {
     `;
     try {
         // ★修正ポイント
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -202,7 +202,7 @@ async function generateWordMeaning(word) {
     `;
     try {
         // ★修正ポイント
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: SAFETY_SETTINGS })
