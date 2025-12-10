@@ -91,6 +91,7 @@
         .voters-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-top: 5px; }
         .voter-tag { font-size: 0.7rem; background: #333; padding: 2px 6px; border-radius: 4px; color: #aaa; border: 1px solid #555; }
         
+        /* ★追加: 投票進捗表示用スタイル */
         #vote-progress-display { font-size: 1.2rem; font-weight: bold; color: #ffd700; margin-bottom: 15px; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); }
     </style>
 </head>
@@ -200,6 +201,7 @@
         <h2 id="vote-title">👉 追放投票</h2>
         <p id="vote-desc">怪しい人を選んでください</p>
         
+        <!-- ★追加: 投票進捗の表示 -->
         <div id="vote-progress-display">投票済: 0 / ?</div>
 
         <div id="vote-buttons"></div>
@@ -423,6 +425,7 @@
             if(data.difficulty) changeBackground(data.difficulty);
         });
 
+        // ★追加: 投票進捗の受信
         socket.on('update_vote_progress', (data) => {
             const el = document.getElementById('vote-progress-display');
             if(el) el.textContent = `投票済: ${data.current} / ${data.total}`;
@@ -456,6 +459,7 @@
                         showScreen('wait-vote-screen');
                         document.getElementById('wait-title').textContent = (data.phase==='FOX') ? "🦊 投票待ち..." : "🐺 投票待ち...";
                         document.getElementById('wait-msg').textContent = "";
+                        if(data.deadFoxId) document.getElementById('wait-msg').textContent = "キツネが逆転チャレンジ中です...";
                     }
                 };
                 div.appendChild(btn);
@@ -479,7 +483,6 @@
 
             ul.innerHTML = '';
             
-            // 逆転勝利(FOX_REVERSE)のケースはサーバー側で消滅しているが、念のため残しておく
             if (data.winner === 'FOX_REVERSE') {
                 title.textContent = "🦊 キツネの大逆転勝利！";
                 msg.textContent = `キツネの ${data.victimName} がワードを見抜きました！`;
@@ -531,3 +534,8 @@
     </script>
 </body>
 </html>
+
+### 更新コマンド
+1.  `git add .`
+2.  `git commit -m "狐逆転チャレンジ削除、投票数表示追加"`
+3.  `git push`
