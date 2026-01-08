@@ -1,0 +1,23 @@
+# Node.js
+node_modules/
+npm-debug.log*
+
+# 環境変数
+.env
+.env.local
+.env.*.local
+
+# データファイル
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# ログ
+logs/
+*.log

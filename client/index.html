@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ワードウルフ Online</title>
+  <!-- PWA settings -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#ff6b9d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <link rel="stylesheet" href="styles/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(registration => console.log('SW registered: ', registration))
+          .catch(registrationError => console.log('SW registration failed: ', registrationError));
+      });
+    }
+  </script>
+</head>
+
+<body>
+  <div id="app">
+    <!-- ロビー画面 -->
+    <div id="lobby-screen" class="screen active">
+      <div class="container">
+        <h1 class="title">🐺 ワードウルフ</h1>
+        <p class="subtitle">オンライン</p>
+
+        <div class="card">
+          <input type="text" id="player-name" placeholder="あなたの名前" maxlength="10">
+
+          <div class="wolf-count-section">
+            <label>狼の人数</label>
+            <div class="wolf-count-buttons">
+              <button class="wolf-btn active" data-count="1">1人</button>
+              <button class="wolf-btn" data-count="2">2人</button>
+              <button class="wolf-btn" data-count="3">3人</button>
+            </div>
+          </div>
+
+          <button id="create-room-btn" class="btn btn-primary">ルームを作成</button>
+
+          <div class="divider"><span>または</span></div>
+
+          <input type="text" id="room-id-input" placeholder="ルームIDを入力" maxlength="6">
+          <button id="join-room-btn" class="btn btn-secondary">ルームに参加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 待機画面 -->
+    <div id="waiting-screen" class="screen">
+      <div class="container">
+        <h2>ルーム: <span id="room-id-display"></span></h2>
+        <p class="info-text">このIDを友達に共有してください</p>
+
+        <div class="players-list" id="waiting-players">
+          <!-- 動的に追加 -->
+        </div>
+
+        <p class="player-count"><span id="player-count">0</span>/10 人</p>
+
+        <!-- タイマー設定 -->
+        <div class="timer-setting">
+          <label>⏱️ 議論時間</label>
+          <div class="timer-buttons">
+            <button class="timer-btn active" data-seconds="90">人数×1分30秒</button>
+            <button class="timer-btn" data-seconds="120">人数×2分</button>
+            <button class="timer-btn" data-seconds="150">人数×2分30秒</button>
+          </div>
+          <p class="timer-hint" id="timer-hint">例: 4人なら6分</p>
+        </div>
+
+        <button id="start-game-btn" class="btn btn-primary" disabled>ゲーム開始 (4人以上必要)</button>
+      </div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="game-screen" class="screen">
+      <div class="container">
+        <div class="game-header">
+          <div class="topic-label">
+            <span>あなたの</span>
+            <span>お題</span>
+          </div>
+          <button id="reroll-btn" class="btn btn-reroll">🔄 お題リロール</button>
+        </div>
+
+        <!-- PC向け2カラムレイアウト / スマホでは通常縦並び -->
+        <div class="game-main-layout">
+          <!-- 左カラム: タイマー + お題 + リアクション -->
+          <div class="game-left-column">
+            <div class="timer-section">
+              <div class="timer" id="timer">00:00</div>
+              <p class="timer-info">時間切れで投票へ移動します</p>
+            </div>
+
+            <div class="topic-card" id="topic-card">
+              <p class="topic-hint">タップして確認</p>
+              <p class="topic-text" id="topic-text"></p>
+            </div>
+
+            <div class="reaction-buttons">
+              <button class="btn btn-nice" id="nice-btn">👍 ナイス！</button>
+              <button class="btn btn-suspicious" id="suspicious-btn">🤔 怪しい</button>
+            </div>
+          </div>
+
+          <!-- 右カラム: アクションボタン + 進捗 -->
+          <div class="game-right-column">
+            <button id="ask-ai-btn" class="btn btn-ai">💡 質問案をAIに聞く</button>
+
+            <div class="select-buttons">
+              <button class="btn btn-select" id="select-questioner-btn">🐱 質問者を指名</button>
+              <button class="btn btn-select" id="select-answerer-btn">🐰 回答者を指名</button>
+            </div>
+
+            <div class="progress-section">
+              <h3>議論の進捗チェック</h3>
+              <div id="progress-list">
+                <!-- 動的に追加 -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button id="go-voting-btn" class="btn btn-voting">🗳️ 議論終了・投票へ</button>
+      </div>
+    </div>
+
+
+    <!-- 投票画面 -->
+    <div id="voting-screen" class="screen">
+      <div class="container">
+        <h2 id="voting-title">🦊 狐だと思う人を選んでください</h2>
+        <p id="voting-info" class="info-text">最も怪しいと思う人に投票してください</p>
+
+        <div id="voting-players" class="voting-grid">
+          <!-- 動的に追加 -->
+        </div>
+
+        <div id="vote-waiting" class="hidden">
+          <p>他のプレイヤーの投票を待っています...</p>
+          <div class="loader"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- リザルト画面 -->
+    <div id="result-screen" class="screen">
+      <div class="container">
+        <div id="winner-banner" class="winner-banner">
+          <!-- 動的に設定 -->
+        </div>
+
+        <div class="result-section">
+          <h3>📋 役職公開</h3>
+          <div id="result-players" class="result-players">
+            <!-- 動的に追加 -->
+          </div>
+        </div>
+
+        <div class="result-section">
+          <h3>🎯 お題一覧</h3>
+          <div id="result-topics" class="result-topics">
+            <!-- 動的に追加 -->
+          </div>
+        </div>
+
+        <div class="result-section">
+          <h3>🗳️ 投票結果</h3>
+          <div id="result-votes" class="result-votes">
+            <!-- 動的に追加 -->
+          </div>
+        </div>
+
+        <button id="play-again-btn" class="btn btn-primary">もう一度遊ぶ</button>
+      </div>
+    </div>
+
+    <!-- 質問案モーダル -->
+    <div id="questions-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>💡 質問案</h3>
+        <ul id="questions-list">
+          <!-- 動的に追加 -->
+        </ul>
+        <button class="btn btn-secondary modal-close">閉じる</button>
+      </div>
+    </div>
+
+    <!-- 全員回答モーダル -->
+    <div id="all-answer-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>⚡ 全員回答タイム！</h3>
+        <p id="all-answer-question"></p>
+        <input type="text" id="all-answer-input" placeholder="あなたの回答を入力">
+        <button id="submit-answer-btn" class="btn btn-primary">回答を送信</button>
+      </div>
+    </div>
+
+    <!-- リアクション表示 -->
+    <div id="reaction-overlay" class="reaction-overlay hidden">
+      <img id="reaction-image" src="" alt="">
+      <audio id="reaction-audio" src=""></audio>
+    </div>
+
+    <!-- 指名表示 -->
+    <div id="selection-overlay" class="selection-overlay hidden">
+      <div class="selection-content">
+        <p id="selection-text"></p>
+      </div>
+    </div>
+
+    <!-- ローディングオーバーレイ -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p id="loading-text">お題を生成中...</p>
+        <p class="loading-subtext">しばらくお待ちください</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="scripts/app.js"></script>
+</body>
+
+</html>
