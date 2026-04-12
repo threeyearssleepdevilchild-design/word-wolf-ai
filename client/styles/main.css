@@ -393,6 +393,44 @@ input[type="text"]:focus {
   background: rgba(168, 85, 247, 0.2);
 }
 
+/* お題モード選択 */
+.word-mode-section {
+  margin-bottom: 20px;
+}
+
+.word-mode-section label {
+  display: block;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  font-size: 0.875rem;
+}
+
+.word-mode-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.word-mode-btn {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid var(--accent-pink);
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.word-mode-btn.active {
+  background: var(--accent-pink);
+  color: white;
+}
+
+.word-mode-btn:hover:not(.active) {
+  background: rgba(255, 107, 157, 0.2);
+}
+
 /* ========================================
    待機画面
 ======================================== */
@@ -576,6 +614,12 @@ input[type="text"]:focus {
 .timer.warning {
   color: var(--accent-red);
   animation: pulse 1s infinite;
+}
+
+.timer.no-limit {
+  font-size: 3.5rem;
+  color: var(--accent-blue);
+  text-shadow: 0 0 20px rgba(78, 205, 196, 0.5);
 }
 
 @keyframes pulse {
@@ -1106,6 +1150,191 @@ input[type="text"]:focus {
 
 #questions-list li:last-child {
   margin-bottom: 0;
+}
+
+/* 全員回答結果モーダル */
+.all-answer-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 8px;
+}
+
+.all-answer-result-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.all-answer-result-text {
+  color: var(--accent-yellow);
+  font-size: 0.95rem;
+}
+
+/* 回答順序設定モーダル */
+.modal-info {
+  text-align: center;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  font-size: 0.875rem;
+}
+
+.answer-order-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.answer-order-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-sm);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.answer-order-card:hover {
+  border-color: var(--accent-blue);
+}
+
+.answer-order-card.selected {
+  border-color: var(--accent-green);
+  background: rgba(107, 203, 119, 0.15);
+}
+
+.answer-order-card p {
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.order-number {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  color: #000;
+  font-weight: 900;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#answer-order-preview {
+  margin-bottom: 16px;
+}
+
+#answer-order-preview h4 {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+#answer-order-list {
+  padding-left: 20px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+#answer-order-list li {
+  margin-bottom: 4px;
+}
+
+/* 回答順序表示（ゲーム画面） */
+.answer-order-display {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-left: 3px solid var(--accent-blue);
+}
+
+.answer-order-display h4 {
+  font-size: 0.875rem;
+  color: var(--accent-blue);
+  margin-bottom: 8px;
+}
+
+.answer-order-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  transition: all 0.3s;
+}
+
+.answer-order-item.current {
+  background: rgba(78, 205, 196, 0.2);
+  border: 1px solid var(--accent-blue);
+}
+
+.answer-order-item.done {
+  opacity: 0.5;
+}
+
+.order-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.answer-order-item.current .order-num {
+  background: var(--accent-blue);
+  color: #000;
+}
+
+.answer-order-item.done .order-num {
+  background: var(--accent-green);
+  color: #000;
+}
+
+.order-name {
+  flex: 1;
+}
+
+.order-check {
+  color: var(--accent-green);
+  font-weight: 700;
+}
+
+.order-arrow {
+  color: var(--accent-blue);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* 回答促しモーダル */
+.your-turn-content {
+  text-align: center;
+}
+
+.your-turn-content h3 {
+  font-size: 1.5rem;
+  color: var(--accent-yellow);
+  animation: pulse 1s infinite;
 }
 
 /* ========================================

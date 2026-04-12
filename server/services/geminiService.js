@@ -59,9 +59,10 @@ function addToWordHistory(newWords) {
 
 /**
  * ワードウルフのお題を生成する
+ * @param {string} wordMode 'adult' または 'safe'
  * @returns {Promise<{village: string, wolf: string, fox: string}>}
  */
-async function generateTopics() {
+async function generateTopics(wordMode = 'adult') {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // 過去の履歴を取得
@@ -70,14 +71,61 @@ async function generateTopics() {
         ? `\n\n【使用禁止ワード - 過去に使用済み】\n${wordHistory.join('、')}`
         : '';
 
-    // ランダムにパターンを選択（50%ずつ）
-    const isPatternA = Math.random() < 0.5;
-
     let prompt;
 
-    if (isPatternA) {
-        // パターンA: 村/狼が大人向け、狐が一般ワード
+    if (wordMode === 'safe') {
+        // 一般モード: 全て安全なワード
         prompt = `あなたはワードウルフゲームのお題を生成するAIです。
+全年齢対応の一般的なお題を生成してください。
+
+【ルール】
+- village と wolf は同じジャンルの似た一般的な言葉にする
+- fox は全く違うジャンルの一般的な言葉にする
+- 3つ全てが同じジャンルにならないようにする（これが最重要）
+- R-18、セクシー、アダルトな内容は絶対に含めないこと
+
+【絶対に守るべきルール】
+1. villageとwolfは同じジャンルの似た言葉にする（例：コーヒーと紅茶、どちらも飲み物）
+2. foxは全く違うジャンルで、かすりもしない言葉にする（例：消防車）
+3. 3つ全てが同じジャンルにならないようにする
+4. 【重要】villageとwolfは「意味が重複しない」こと！
+   - NG例: 「リンゴ」と「果物」（リンゴは果物の一種なのでNG）
+   - NG例: 「犬」と「動物」（犬は動物の一種なのでNG）
+   - OK例: 「コーヒー」と「紅茶」（同じカテゴリだが別物なのでOK）
+
+【参考カテゴリ】
+- 食べ物・飲み物（ラーメンとうどん、コーラとサイダー）
+- 動物（犬と猫、ライオンとトラ）
+- スポーツ（野球とサッカー、テニスとバドミントン）
+- 乗り物（電車とバス、飛行機とヘリコプター）
+- 場所・建物（東京タワーとスカイツリー、学校と塾）
+- 季節・行事（クリスマスとハロウィン、花火と盆踊り）
+- 楽器・音楽（ギターとベース、ピアノとオルガン）
+- ゲーム・遊び（将棋とチェス、トランプとUNO）
+- 文房具（鉛筆とシャーペン、ノートとルーズリーフ）
+- 家電・道具（掃除機とほうき、冷蔵庫と冷凍庫）
+
+【良い例】
+village: "コーヒー"
+wolf: "紅茶"
+fox: "消防車"
+
+【他の良い例】
+village: "ピアノ"
+wolf: "ギター"
+fox: "カレーライス"${historyList}
+
+【出力形式】
+以下のJSON形式のみで出力してください。説明は不要です。
+{"village": "xxx", "wolf": "xxx", "fox": "xxx"}`;
+    } else {
+        // 大人向けモード: 既存のパターンA/B
+        // ランダムにパターンを選択（50%ずつ）
+        const isPatternA = Math.random() < 0.5;
+
+        if (isPatternA) {
+            // パターンA: 村/狼が大人向け、狐が一般ワード
+            prompt = `あなたはワードウルフゲームのお題を生成するAIです。
 今回は【パターンA】で生成してください。
 
 【パターンA - 村人と狼が大人向け、狐が一般ワード】
@@ -118,9 +166,9 @@ fox: "原子力発電所"（一般ワード、全く違うジャンル）${histo
 【出力形式】
 以下のJSON形式のみで出力してください。説明は不要です。
 {"village": "xxx", "wolf": "xxx", "fox": "xxx"}`;
-    } else {
-        // パターンB: 狐が大人向け、村/狼が一般ワード
-        prompt = `あなたはワードウルフゲームのお題を生成するAIです。
+        } else {
+            // パターンB: 狐が大人向け、村/狼が一般ワード
+            prompt = `あなたはワードウルフゲームのお題を生成するAIです。
 今回は【パターンB】で生成してください。
 
 【パターンB - 狐が大人向け、村人と狼が一般ワード】
@@ -166,6 +214,7 @@ fox: "ローター"（大人向け、全く違うジャンル）${historyList}
 【出力形式】
 以下のJSON形式のみで出力してください。説明は不要です。
 {"village": "xxx", "wolf": "xxx", "fox": "xxx"}`;
+        }
     }
 
     try {
@@ -181,19 +230,19 @@ fox: "ローター"（大人向け、全く違うジャンル）${historyList}
             // 新しいワードを履歴に追加
             addToWordHistory([topics.village, topics.wolf, topics.fox]);
 
-            console.log(`🎯 お題生成 (${isPatternA ? 'パターンA: 村狼=大人, 狐=一般' : 'パターンB: 村狼=一般, 狐=大人'}):`, topics);
+            console.log(`🎯 お題生成 (${wordMode === 'safe' ? '一般モード' : '大人向けモード'}):`, topics);
 
             return topics;
         }
         throw new Error('Invalid response format');
     } catch (error) {
         console.error('お題生成エラー:', error);
-        // フォールバック（パターンに応じて）
-        if (isPatternA) {
+        // フォールバック
+        if (wordMode === 'safe') {
             return {
-                village: "バイブ",
-                wolf: "ローター",
-                fox: "原子力発電所"
+                village: "コーヒー",
+                wolf: "紅茶",
+                fox: "消防車"
             };
         } else {
             return {

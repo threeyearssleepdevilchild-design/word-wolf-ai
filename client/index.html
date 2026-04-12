@@ -46,6 +46,14 @@
             </div>
           </div>
 
+          <div class="word-mode-section">
+            <label>お題モード</label>
+            <div class="word-mode-buttons">
+              <button class="word-mode-btn active" data-mode="adult">🔞 通常（R-18含む）</button>
+              <button class="word-mode-btn" data-mode="safe">🌱 一般（初心者向け）</button>
+            </div>
+          </div>
+
           <button id="create-room-btn" class="btn btn-primary">ルームを作成</button>
 
           <div class="divider"><span>または</span></div>
@@ -75,6 +83,7 @@
             <button class="timer-btn active" data-seconds="90">人数×1分30秒</button>
             <button class="timer-btn" data-seconds="120">人数×2分</button>
             <button class="timer-btn" data-seconds="150">人数×2分30秒</button>
+            <button class="timer-btn" data-seconds="0">♾️ 無制限</button>
           </div>
           <p class="timer-hint" id="timer-hint">例: 4人なら6分</p>
         </div>
@@ -121,6 +130,11 @@
             <div class="select-buttons">
               <button class="btn btn-select" id="select-questioner-btn">🐱 質問者を指名</button>
               <button class="btn btn-select" id="select-answerer-btn">🐰 回答者を指名</button>
+            </div>
+
+            <div id="answer-order-display" class="answer-order-display hidden">
+              <h4>📋 回答順序</h4>
+              <div id="answer-order-status"></div>
             </div>
 
             <div class="progress-section">
@@ -204,6 +218,38 @@
         <p id="all-answer-question"></p>
         <input type="text" id="all-answer-input" placeholder="あなたの回答を入力">
         <button id="submit-answer-btn" class="btn btn-primary">回答を送信</button>
+      </div>
+    </div>
+
+    <!-- 全員回答結果モーダル -->
+    <div id="all-answers-result-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>⚡ 全員回答結果</h3>
+        <div id="all-answers-result-list"></div>
+        <button class="btn btn-secondary" id="close-all-answers-result">閉じる</button>
+      </div>
+    </div>
+
+    <!-- 回答順序設定モーダル (質問者用) -->
+    <div id="answer-order-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>📋 回答順序を設定</h3>
+        <p class="modal-info">回答させたい順番でタップしてください</p>
+        <div id="answer-order-players" class="answer-order-grid"></div>
+        <div id="answer-order-preview">
+          <h4>回答順序:</h4>
+          <ol id="answer-order-list"></ol>
+        </div>
+        <button id="confirm-answer-order-btn" class="btn btn-primary" disabled>確定</button>
+      </div>
+    </div>
+
+    <!-- 回答促しモーダル -->
+    <div id="your-turn-modal" class="modal hidden">
+      <div class="modal-content your-turn-content">
+        <h3>🎯 あなたの番です！</h3>
+        <p>声で回答してください</p>
+        <button class="btn btn-primary" id="your-turn-close">OK</button>
       </div>
     </div>
 

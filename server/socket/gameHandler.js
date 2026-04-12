@@ -15,7 +15,7 @@ function gameHandler(io) {
         console.log(`✅ 接続: ${socket.id}`);
 
         // ルーム作成
-        socket.on('createRoom', async ({ playerName, wolfCount, sessionId }) => {
+        socket.on('createRoom', async ({ playerName, wolfCount, wordMode, sessionId }) => {
             const roomId = generateRoomId();
             const room = {
                 id: roomId,
@@ -32,10 +32,12 @@ function gameHandler(io) {
                     isConnected: true
                 }],
                 wolfCount: wolfCount || 1,
+                wordMode: wordMode || 'adult',
                 topics: null,
                 gameState: 'waiting', // waiting, playing, voting-fox, voting-wolf, result
                 timer: null,
                 timerSeconds: 0,
+                noTimeLimit: false,
                 votes: {
                     fox: {},
                     wolf: {}
@@ -239,7 +241,7 @@ function gameHandler(io) {
             }
 
             // お題生成
-            room.topics = await generateTopics();
+            room.topics = await generateTopics(room.wordMode);
 
             // 役職割り当て
             assignRoles(room);
@@ -249,7 +251,13 @@ function gameHandler(io) {
 
             // タイマー設定（人数 × 秒/人）
             const spp = secondsPerPlayer || 90; // デフォルト: 1分30秒/人
-            room.timerSeconds = room.players.length * spp;
+            room.noTimeLimit = spp === 0;
+
+            if (room.noTimeLimit) {
+                room.timerSeconds = -1;
+            } else {
+                room.timerSeconds = room.players.length * spp;
+            }
 
             // 各プレイヤーに個別の情報を送信
             room.players.forEach(player => {
@@ -257,6 +265,7 @@ function gameHandler(io) {
                     role: player.role,
                     word: player.word,
                     timerSeconds: room.timerSeconds,
+                    noTimeLimit: room.noTimeLimit,
                     players: room.players.map(p => ({
                         id: p.id,
                         name: p.name,
@@ -266,8 +275,10 @@ function gameHandler(io) {
                 });
             });
 
-            // タイマー開始
-            startTimer(io, room);
+            // タイマー開始（制限時間ありの場合のみ）
+            if (!room.noTimeLimit) {
+                startTimer(io, room);
+            }
             console.log(`🎮 ゲーム開始: ルーム ${room.id}`);
         });
 
@@ -276,7 +287,7 @@ function gameHandler(io) {
             const room = rooms.get(socket.roomId);
             if (!room || room.gameState !== 'playing') return;
 
-            room.topics = await generateTopics();
+            room.topics = await generateTopics(room.wordMode);
             assignRoles(room);
 
             room.players.forEach(player => {
@@ -312,10 +323,14 @@ function gameHandler(io) {
             socket.emit('questionsGenerated', { questions });
         });
 
-        // 質問者指名（チェックなしの質問者からランダム、20%で全員回答）
+        // 質問者指名（チェックなしの質問者からランダム、10%で全員回答）
         socket.on('selectQuestioner', () => {
             const room = rooms.get(socket.roomId);
             if (!room) return;
+
+            // 回答順序をリセット
+            room.answerOrder = null;
+            room.currentAnswerIndex = 0;
 
             const availableForQuestion = room.players.filter(p => !p.hasAsked);
             if (availableForQuestion.length === 0) {
@@ -324,7 +339,11 @@ function gameHandler(io) {
             }
 
             const questioner = availableForQuestion[Math.floor(Math.random() * availableForQuestion.length)];
-            const isAllAnswerMode = Math.random() < 0.2;
+            const isAllAnswerMode = Math.random() < 0.1;
+
+            if (isAllAnswerMode) {
+                room.allAnswers = [];
+            }
 
             io.to(socket.roomId).emit('questionerSelected', {
                 questioner: { id: questioner.id, name: questioner.name },
@@ -344,7 +363,11 @@ function gameHandler(io) {
             }
 
             const answerer = availableForAnswer[Math.floor(Math.random() * availableForAnswer.length)];
-            const isAllAnswerMode = Math.random() < 0.2;
+            const isAllAnswerMode = Math.random() < 0.1;
+
+            if (isAllAnswerMode) {
+                room.allAnswers = [];
+            }
 
             io.to(socket.roomId).emit('answererSelected', {
                 answerer: { id: answerer.id, name: answerer.name },
@@ -352,7 +375,7 @@ function gameHandler(io) {
             });
         });
 
-        // 全員回答の結果を共有
+        // 全員回答の結果を共有（全員出揃ったら一斉公開）
         socket.on('submitAllAnswer', ({ answer }) => {
             const room = rooms.get(socket.roomId);
             if (!room) return;
@@ -360,11 +383,66 @@ function gameHandler(io) {
             const player = room.players.find(p => p.id === socket.id);
             if (!player) return;
 
-            io.to(socket.roomId).emit('allAnswerSubmitted', {
-                playerId: socket.id,
-                playerName: player.name,
-                answer
+            // 回答を保存
+            if (!room.allAnswers) {
+                room.allAnswers = [];
+            }
+
+            // 既に回答済みなら更新、なければ追加
+            const existingIndex = room.allAnswers.findIndex(a => a.playerId === socket.id);
+            if (existingIndex !== -1) {
+                room.allAnswers[existingIndex] = { playerId: socket.id, playerName: player.name, answer };
+            } else {
+                room.allAnswers.push({ playerId: socket.id, playerName: player.name, answer });
+            }
+
+            // 接続中のプレイヤー数をカウント
+            const connectedPlayersCount = room.players.filter(p => p.isConnected).length;
+
+            // 全員の回答が出揃ったか確認
+            if (room.allAnswers.length >= connectedPlayersCount) {
+                io.to(socket.roomId).emit('allAnswersRevealed', {
+                    answers: room.allAnswers
+                });
+                // 回答リセット (次回のためにクリアするか、そのまま保持するかは仕様次第だが、ここではクリアしないでおく。
+                // 次の質問フェーズで room.allAnswers が再初期化されるため)
+            } else {
+                // まだ全員揃っていないことを通知（必要であれば）
+                // クライアント側で「他待機中」を表示するので、ここでは特に何もしなくてOK
+                // ただし、誰が回答完了したかを知りたい場合はイベントを送る
+                io.to(socket.roomId).emit('answerSubmittedProgress', {
+                    answeredCount: room.allAnswers.length,
+                    totalCount: connectedPlayersCount
+                });
+            }
+        });
+
+        // 回答順序設定（質問者から）
+        socket.on('setAnswerOrder', ({ order }) => {
+            const room = rooms.get(socket.roomId);
+            if (!room) return;
+
+            room.answerOrder = order;
+            room.currentAnswerIndex = 0;
+
+            const orderWithNames = order.map(id => {
+                const p = room.players.find(pl => pl.id === id);
+                return { id, name: p ? p.name : '???' };
             });
+
+            io.to(socket.roomId).emit('answerOrderSet', {
+                order: orderWithNames,
+                currentIndex: 0
+            });
+
+            // 最初の回答者に通知
+            if (order.length > 0) {
+                io.to(order[0]).emit('promptAnswerer', {
+                    playerName: orderWithNames[0].name
+                });
+            }
+
+            console.log(`📋 回答順序設定: ルーム ${room.id}`);
         });
 
         // 質問/回答チェック更新
@@ -386,6 +464,24 @@ function gameHandler(io) {
                 type,
                 checked
             });
+
+            // 回答順序がある場合、次の回答者に通知
+            if (type === 'answered' && checked && room.answerOrder) {
+                const currentIdx = room.currentAnswerIndex;
+                if (currentIdx < room.answerOrder.length && room.answerOrder[currentIdx] === playerId) {
+                    room.currentAnswerIndex++;
+                    const nextIdx = room.currentAnswerIndex;
+
+                    io.to(socket.roomId).emit('answerOrderUpdate', { currentIndex: nextIdx });
+
+                    if (nextIdx < room.answerOrder.length) {
+                        const nextPlayer = room.players.find(p => p.id === room.answerOrder[nextIdx]);
+                        io.to(room.answerOrder[nextIdx]).emit('promptAnswerer', {
+                            playerName: nextPlayer ? nextPlayer.name : '???'
+                        });
+                    }
+                }
+            }
         });
 
         // 投票画面への移行
@@ -496,6 +592,8 @@ function gameHandler(io) {
             room.gameState = 'waiting';
             room.topics = null;
             room.votes = { fox: {}, wolf: {} };
+            room.answerOrder = null;
+            room.currentAnswerIndex = 0;
             room.players.forEach(p => {
                 p.role = null;
                 p.word = null;

@@ -50,6 +50,7 @@ const state = {
     role: null,
     word: null,
     wolfCount: 1,
+    wordMode: 'adult',
     players: [],
     topicRevealed: false,
     isReconnecting: false
@@ -172,6 +173,15 @@ document.querySelectorAll('.wolf-btn').forEach(btn => {
     });
 });
 
+// お題モード選択
+document.querySelectorAll('.word-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.word-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.wordMode = btn.dataset.mode;
+    });
+});
+
 // ルーム作成
 document.getElementById('create-room-btn').addEventListener('click', () => {
     const name = document.getElementById('player-name').value.trim();
@@ -183,6 +193,7 @@ document.getElementById('create-room-btn').addEventListener('click', () => {
     socket.emit('createRoom', {
         playerName: name,
         wolfCount: state.wolfCount,
+        wordMode: state.wordMode,
         sessionId: state.sessionId
     });
 });
@@ -230,6 +241,10 @@ document.querySelectorAll('.timer-btn').forEach(btn => {
 
 function updateTimerHint() {
     const playerCount = state.players.length || 4;
+    if (selectedSecondsPerPlayer === 0) {
+        document.getElementById('timer-hint').textContent = `制限時間なし（自由に議論してください）`;
+        return;
+    }
     const totalSeconds = playerCount * selectedSecondsPerPlayer;
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
@@ -395,6 +410,7 @@ document.querySelector('#questions-modal .modal-close').addEventListener('click'
 
 let currentVotePhase = null;
 let selectedVote = null;
+let currentAnswerOrderSelection = [];
 
 function renderVotingPlayers(players) {
     const container = document.getElementById('voting-players');
@@ -602,7 +618,19 @@ socket.on('rejoinSuccess', ({ roomId, gameState, role, word, timerSeconds, playe
         document.getElementById('topic-text').textContent = word;
         document.getElementById('topic-card').classList.remove('revealed');
         state.topicRevealed = false;
-        updateTimer(timerSeconds);
+        const timerEl = document.getElementById('timer');
+        const timerInfo = document.querySelector('.timer-info');
+        if (timerSeconds === -1) {
+            state.noTimeLimit = true;
+            timerEl.textContent = '♾️';
+            timerEl.classList.remove('warning');
+            timerEl.classList.add('no-limit');
+            timerInfo.textContent = 'ホストが投票へ移行してください';
+        } else {
+            state.noTimeLimit = false;
+            timerEl.classList.remove('no-limit');
+            updateTimer(timerSeconds);
+        }
         updateProgressList(players);
         showScreen('game');
     } else if (gameState === 'voting-fox') {
@@ -683,22 +711,37 @@ socket.on('playerJoined', ({ players }) => {
     }
 });
 
-socket.on('gameStarted', ({ role, word, timerSeconds, players }) => {
+socket.on('gameStarted', ({ role, word, timerSeconds, players, noTimeLimit }) => {
     hideLoading();
     state.role = role;
     state.word = word;
     state.players = players;
     state.topicRevealed = false;
+    state.noTimeLimit = noTimeLimit || false;
 
     document.getElementById('topic-text').textContent = word;
     document.getElementById('topic-card').classList.remove('revealed');
-    updateTimer(timerSeconds);
+
+    const timerEl = document.getElementById('timer');
+    const timerInfo = document.querySelector('.timer-info');
+    if (state.noTimeLimit) {
+        timerEl.textContent = '♾️';
+        timerEl.classList.remove('warning');
+        timerEl.classList.add('no-limit');
+        timerInfo.textContent = 'ホストが投票へ移行してください';
+    } else {
+        timerEl.classList.remove('no-limit');
+        updateTimer(timerSeconds);
+    }
+
     updateProgressList(players);
     showScreen('game');
 });
 
 socket.on('timerUpdate', ({ seconds }) => {
-    updateTimer(seconds);
+    if (!state.noTimeLimit) {
+        updateTimer(seconds);
+    }
 });
 
 socket.on('topicsRerolled', ({ role, word }) => {
@@ -743,6 +786,11 @@ socket.on('questionerSelected', ({ questioner, isAllAnswerMode }) => {
     const overlay = document.getElementById('selection-overlay');
     const text = document.getElementById('selection-text');
 
+    // 回答順序をリセット
+    state.answerOrder = null;
+    state.currentAnswerIndex = 0;
+    updateAnswerOrderDisplay();
+
     if (isAllAnswerMode) {
         text.innerHTML = `⚡ 全員回答タイム！<br>質問者: ${escapeHtml(questioner.name)}`;
         overlay.classList.remove('hidden');
@@ -757,6 +805,10 @@ socket.on('questionerSelected', ({ questioner, isAllAnswerMode }) => {
 
         setTimeout(() => {
             overlay.classList.add('hidden');
+            // 自分が質問者なら回答順序設定モーダルを表示
+            if (questioner.id === socket.id) {
+                showAnswerOrderModal();
+            }
         }, 3000);
     }
 });
@@ -784,41 +836,31 @@ socket.on('answererSelected', ({ answerer, isAllAnswerMode }) => {
     }
 });
 
-// 全員回答結果表示
-let allAnswers = [];
-socket.on('allAnswerSubmitted', ({ playerId, playerName, answer }) => {
-    allAnswers.push({ playerName, answer });
-    showAllAnswersResult();
+// 全員回答結果表示（モーダルで表示、閉じたら消える）
+socket.on('allAnswersRevealed', ({ answers }) => {
+    hideLoading();
+    const list = document.getElementById('all-answers-result-list');
+    list.innerHTML = answers.map((a, i) => `
+        <div class="all-answer-result-item">
+            <div class="all-answer-result-player">
+                <img src="${playerIcons[i % playerIcons.length]}" class="player-icon-img small" alt="icon">
+                <span>${escapeHtml(a.playerName)}</span>
+            </div>
+            <div class="all-answer-result-text">「${escapeHtml(a.answer)}」</div>
+        </div>
+    `).join('');
+    document.getElementById('all-answers-result-modal').classList.remove('hidden');
 });
 
-function showAllAnswersResult() {
-    let resultsDiv = document.getElementById('all-answers-result');
-    if (!resultsDiv) {
-        resultsDiv = document.createElement('div');
-        resultsDiv.id = 'all-answers-result';
-        resultsDiv.className = 'all-answers-result';
-        document.getElementById('game-screen').querySelector('.container').appendChild(resultsDiv);
-    }
+document.getElementById('close-all-answers-result').addEventListener('click', () => {
+    document.getElementById('all-answers-result-modal').classList.add('hidden');
+    document.getElementById('all-answers-result-list').innerHTML = '';
+});
 
-    resultsDiv.innerHTML = `
-        <div class="all-answers-header">
-            <span class="all-answers-icon">⚡</span>
-            <h4>全員回答結果</h4>
-        </div>
-        <div class="all-answers-grid">
-            ${allAnswers.map((a, i) => `
-                <div class="answer-card">
-                    <div class="answer-player">
-                        <span class="answer-player-icon">${playerIcons[i % playerIcons.length]}</span>
-                        <span class="answer-player-name">${escapeHtml(a.playerName)}</span>
-                    </div>
-                    <div class="answer-text">${escapeHtml(a.answer)}</div>
-                </div>
-            `).join('')}
-        </div>
-        <button class="btn btn-secondary all-answers-close" onclick="this.closest('.all-answers-result').remove(); allAnswers = [];">× 閉じる</button>
-    `;
-}
+// 回答進捗状況
+socket.on('answerSubmittedProgress', ({ answeredCount, totalCount }) => {
+    showLoading(`他のプレイヤーの回答を待っています... (${answeredCount}/${totalCount})`);
+});
 
 socket.on('checkUpdated', ({ playerId, type, checked }) => {
     const player = state.players.find(p => p.id === playerId);
@@ -882,6 +924,122 @@ socket.on('error', ({ message }) => {
 });
 
 // ========================================
+// 回答順序機能
+// ========================================
+
+function showAnswerOrderModal() {
+    const modal = document.getElementById('answer-order-modal');
+    const playersContainer = document.getElementById('answer-order-players');
+    const orderList = document.getElementById('answer-order-list');
+    const confirmBtn = document.getElementById('confirm-answer-order-btn');
+
+    currentAnswerOrderSelection = [];
+    const otherPlayers = state.players.filter(p => p.id !== socket.id);
+
+    playersContainer.innerHTML = otherPlayers.map((p, i) => `
+        <div class="answer-order-card" data-player-id="${p.id}">
+            <img src="${playerIcons[i % playerIcons.length]}" class="player-icon-img" alt="icon">
+            <p>${escapeHtml(p.name)}</p>
+            <span class="order-number hidden"></span>
+        </div>
+    `).join('');
+
+    orderList.innerHTML = '';
+    confirmBtn.disabled = true;
+
+    playersContainer.querySelectorAll('.answer-order-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const playerId = card.dataset.playerId;
+            const existingIndex = currentAnswerOrderSelection.indexOf(playerId);
+
+            if (existingIndex !== -1) {
+                // 選択解除
+                currentAnswerOrderSelection.splice(existingIndex, 1);
+                card.classList.remove('selected');
+            } else {
+                // 選択追加
+                currentAnswerOrderSelection.push(playerId);
+                card.classList.add('selected');
+            }
+
+            // 番号を更新
+            playersContainer.querySelectorAll('.answer-order-card').forEach(c => {
+                const pid = c.dataset.playerId;
+                const idx = currentAnswerOrderSelection.indexOf(pid);
+                const numEl = c.querySelector('.order-number');
+                if (idx !== -1) {
+                    numEl.textContent = idx + 1;
+                    numEl.classList.remove('hidden');
+                } else {
+                    numEl.classList.add('hidden');
+                }
+            });
+
+            // プレビュー更新
+            orderList.innerHTML = currentAnswerOrderSelection.map((id) => {
+                const player = otherPlayers.find(p => p.id === id);
+                return `<li>${player ? escapeHtml(player.name) : '???'}</li>`;
+            }).join('');
+
+            // 全員選んだら確定ボタン有効化
+            confirmBtn.disabled = currentAnswerOrderSelection.length !== otherPlayers.length;
+        });
+    });
+
+    modal.classList.remove('hidden');
+}
+
+document.getElementById('confirm-answer-order-btn').addEventListener('click', () => {
+    socket.emit('setAnswerOrder', { order: currentAnswerOrderSelection });
+    document.getElementById('answer-order-modal').classList.add('hidden');
+});
+
+document.getElementById('your-turn-close').addEventListener('click', () => {
+    document.getElementById('your-turn-modal').classList.add('hidden');
+});
+
+// 回答順序が設定された
+socket.on('answerOrderSet', ({ order, currentIndex }) => {
+    state.answerOrder = order;
+    state.currentAnswerIndex = currentIndex;
+    updateAnswerOrderDisplay();
+});
+
+// 回答順序が進んだ
+socket.on('answerOrderUpdate', ({ currentIndex }) => {
+    state.currentAnswerIndex = currentIndex;
+    updateAnswerOrderDisplay();
+});
+
+// 自分の回答の番
+socket.on('promptAnswerer', () => {
+    document.getElementById('your-turn-modal').classList.remove('hidden');
+});
+
+function updateAnswerOrderDisplay() {
+    const display = document.getElementById('answer-order-display');
+    const status = document.getElementById('answer-order-status');
+
+    if (!state.answerOrder || state.answerOrder.length === 0) {
+        display.classList.add('hidden');
+        return;
+    }
+
+    display.classList.remove('hidden');
+    status.innerHTML = state.answerOrder.map((p, i) => {
+        let className = 'answer-order-item';
+        if (i < state.currentAnswerIndex) className += ' done';
+        else if (i === state.currentAnswerIndex) className += ' current';
+        return `<div class="${className}">
+            <span class="order-num">${i + 1}</span>
+            <span class="order-name">${escapeHtml(p.name)}</span>
+            ${i < state.currentAnswerIndex ? '<span class="order-check">✓</span>' : ''}
+            ${i === state.currentAnswerIndex ? '<span class="order-arrow">👈 回答中</span>' : ''}
+        </div>`;
+    }).join('');
+}
+
+// ========================================
 // ユーティリティ関数
 // ========================================
 
@@ -908,5 +1066,6 @@ document.getElementById('submit-answer-btn').addEventListener('click', () => {
         socket.emit('submitAllAnswer', { answer });
         document.getElementById('all-answer-modal').classList.add('hidden');
         input.value = '';
+        showLoading('他のプレイヤーの回答を待っています...');
     }
 });
