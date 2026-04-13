@@ -149,6 +149,14 @@ function showScreen(screenName) {
     Object.values(screens).forEach(screen => screen.classList.remove('active'));
     screens[screenName].classList.add('active');
 
+    // ゲーム中・投票中のみリセットボタンを表示
+    const resetBtn = document.getElementById('room-reset-btn');
+    if (['game', 'voting'].includes(screenName)) {
+        resetBtn.classList.remove('hidden');
+    } else {
+        resetBtn.classList.add('hidden');
+    }
+
     // 背景画像の切り替え
     document.body.classList.remove('bg-lobby', 'bg-game', 'bg-result');
 
@@ -387,6 +395,13 @@ document.getElementById('select-questioner-btn').addEventListener('click', () =>
 // 回答者指名
 document.getElementById('select-answerer-btn').addEventListener('click', () => {
     socket.emit('selectAnswerer');
+});
+
+// ルームリセットボタン
+document.getElementById('room-reset-btn').addEventListener('click', () => {
+    if (confirm('ゲームをリセットして待機画面に戻りますか？\n全員の役職・お題がリセットされます。')) {
+        socket.emit('playAgain');
+    }
 });
 
 // 投票へ移行

@@ -2509,6 +2509,37 @@ input[type="text"]:focus {
   display: none;
 }
 
+/* ルームリセットボタン（画面右下固定） */
+.room-reset-btn {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(30, 30, 50, 0.85);
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 500;
+  transition: all 0.3s;
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.room-reset-btn:hover {
+  background: rgba(255, 107, 107, 0.25);
+  color: var(--accent-red);
+  transform: rotate(30deg);
+}
+
+.room-reset-btn.hidden {
+  display: none;
+}
+
 .loading-content {
   text-align: center;
 }
