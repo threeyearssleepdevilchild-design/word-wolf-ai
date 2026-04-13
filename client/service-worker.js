@@ -1,4 +1,4 @@
-const CACHE_NAME = 'word-wolf-v2';
+const CACHE_NAME = 'word-wolf-v3';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

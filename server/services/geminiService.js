@@ -1,19 +1,22 @@
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 const path = require('path');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// セーフティ設定（コンテンツフィルタによるブロックを防止）
-const safetySettings = [
-    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-];
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // 履歴ファイルのパス
 const HISTORY_FILE = path.join(__dirname, '../../data/word_history.json');
+
+// リトライ設定
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
+/**
+ * 指定ミリ秒待つ
+ */
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /**
  * 過去に使用したワードの履歴を取得
@@ -21,7 +24,6 @@ const HISTORY_FILE = path.join(__dirname, '../../data/word_history.json');
  */
 function getWordHistory() {
     try {
-        // データディレクトリが存在しない場合は作成
         const dataDir = path.dirname(HISTORY_FILE);
         if (!fs.existsSync(dataDir)) {
             fs.mkdirSync(dataDir, { recursive: true });
@@ -39,21 +41,17 @@ function getWordHistory() {
 
 /**
  * 新しいワードを履歴に追加（最大50件保持）
- * @param {string[]} newWords 
+ * @param {string[]} newWords
  */
 function addToWordHistory(newWords) {
     try {
         let history = getWordHistory();
-
-        // 新しいワードを追加
         history = [...newWords, ...history];
 
-        // 50件を超えたら古いものを削除
         if (history.length > 50) {
             history = history.slice(0, 50);
         }
 
-        // データディレクトリが存在しない場合は作成
         const dataDir = path.dirname(HISTORY_FILE);
         if (!fs.existsSync(dataDir)) {
             fs.mkdirSync(dataDir, { recursive: true });
@@ -66,14 +64,60 @@ function addToWordHistory(newWords) {
 }
 
 /**
+ * Gemini APIにリトライ付きでリクエストを送信
+ * @param {string} prompt
+ * @returns {Promise<string>} レスポンステキスト
+ */
+async function callGeminiWithRetry(prompt) {
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            console.log(`🔄 Gemini API 呼び出し (試行 ${attempt}/${MAX_RETRIES})...`);
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    safetySettings: [
+                        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' },
+                        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
+                        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
+                        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
+                    ],
+                },
+            });
+
+            const text = response.text.trim();
+
+            if (!text) {
+                throw new Error('空のレスポンス');
+            }
+
+            console.log(`✅ Gemini API 成功 (試行 ${attempt})`);
+            return text;
+
+        } catch (error) {
+            lastError = error;
+            console.error(`⚠️ Gemini API 試行 ${attempt} 失敗:`, error.message || error);
+
+            if (attempt < MAX_RETRIES) {
+                const delay = RETRY_DELAY_MS * attempt;
+                console.log(`⏳ ${delay}ms 後にリトライ...`);
+                await sleep(delay);
+            }
+        }
+    }
+
+    throw lastError;
+}
+
+/**
  * ワードウルフのお題を生成する
  * @param {string} wordMode 'adult' または 'safe'
  * @returns {Promise<{village: string, wolf: string, fox: string}>}
  */
 async function generateTopics(wordMode = 'adult') {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', safetySettings });
-
-    // 過去の履歴を取得
     const wordHistory = getWordHistory();
     const historyList = wordHistory.length > 0
         ? `\n\n【使用禁止ワード - 過去に使用済み】\n${wordHistory.join('、')}`
@@ -82,7 +126,6 @@ async function generateTopics(wordMode = 'adult') {
     let prompt;
 
     if (wordMode === 'safe') {
-        // 一般モード: 全て安全なワード
         prompt = `あなたはワードウルフゲームのお題を生成するAIです。
 全年齢対応の一般的なお題を生成してください。
 
@@ -127,12 +170,9 @@ fox: "カレーライス"${historyList}
 以下のJSON形式のみで出力してください。説明は不要です。
 {"village": "xxx", "wolf": "xxx", "fox": "xxx"}`;
     } else {
-        // 大人向けモード: 既存のパターンA/B
-        // ランダムにパターンを選択（50%ずつ）
         const isPatternA = Math.random() < 0.5;
 
         if (isPatternA) {
-            // パターンA: 村/狼が大人向け、狐が一般ワード
             prompt = `あなたはワードウルフゲームのお題を生成するAIです。
 今回は【パターンA】で生成してください。
 
@@ -175,7 +215,6 @@ fox: "原子力発電所"（一般ワード、全く違うジャンル）${histo
 以下のJSON形式のみで出力してください。説明は不要です。
 {"village": "xxx", "wolf": "xxx", "fox": "xxx"}`;
         } else {
-            // パターンB: 狐が大人向け、村/狼が一般ワード
             prompt = `あなたはワードウルフゲームのお題を生成するAIです。
 今回は【パターンB】で生成してください。
 
@@ -226,25 +265,26 @@ fox: "ローター"（大人向け、全く違うジャンル）${historyList}
     }
 
     try {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text().trim();
+        const text = await callGeminiWithRetry(prompt);
 
         // JSON部分を抽出
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const topics = JSON.parse(jsonMatch[0]);
 
-            // 新しいワードを履歴に追加
+            // 必須フィールドのバリデーション
+            if (!topics.village || !topics.wolf || !topics.fox) {
+                throw new Error('レスポンスに必要なフィールドがありません: ' + JSON.stringify(topics));
+            }
+
             addToWordHistory([topics.village, topics.wolf, topics.fox]);
 
-            console.log(`🎯 お題生成 (${wordMode === 'safe' ? '一般モード' : '大人向けモード'}):`, topics);
-
+            console.log(`🎯 お題生成成功 (${wordMode === 'safe' ? '一般モード' : '大人向けモード'}):`, topics);
             return topics;
         }
-        throw new Error('Invalid response format');
+        throw new Error('JSONが見つかりません。レスポンス: ' + text.substring(0, 200));
     } catch (error) {
-        console.error('お題生成エラー:', error.message || error);
+        console.error('❌ お題生成エラー（フォールバック使用）:', error.message || error);
         // フォールバック（ランダムに選択）
         const safeFallbacks = [
             { village: "コーヒー", wolf: "紅茶", fox: "消防車" },
@@ -276,8 +316,6 @@ fox: "ローター"（大人向け、全く違うジャンル）${historyList}
  * @returns {Promise<string[]>}
  */
 async function generateQuestions(topic) {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', safetySettings });
-
     const prompt = `ワードウルフゲームで「${topic}」というお題が出ています。
 このお題について他の参加者に質問する内容を5個、簡潔に提案してください。
 質問は相手が村人か狼かを見極めるのに役立つものにしてください。
@@ -287,9 +325,7 @@ async function generateQuestions(topic) {
 ["質問1", "質問2", "質問3", "質問4", "質問5"]`;
 
     try {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text().trim();
+        const text = await callGeminiWithRetry(prompt);
 
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
@@ -297,7 +333,7 @@ async function generateQuestions(topic) {
         }
         throw new Error('Invalid response format');
     } catch (error) {
-        console.error('質問生成エラー:', error);
+        console.error('質問生成エラー:', error.message || error);
         return [
             "それを最後に使ったのはいつですか？",
             "それの色は何色ですか？",
