@@ -1,8 +1,16 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const fs = require('fs');
 const path = require('path');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// セーフティ設定（コンテンツフィルタによるブロックを防止）
+const safetySettings = [
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+];
 
 // 履歴ファイルのパス
 const HISTORY_FILE = path.join(__dirname, '../../data/word_history.json');
@@ -63,7 +71,7 @@ function addToWordHistory(newWords) {
  * @returns {Promise<{village: string, wolf: string, fox: string}>}
  */
 async function generateTopics(wordMode = 'adult') {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', safetySettings });
 
     // 過去の履歴を取得
     const wordHistory = getWordHistory();
@@ -236,21 +244,29 @@ fox: "ローター"（大人向け、全く違うジャンル）${historyList}
         }
         throw new Error('Invalid response format');
     } catch (error) {
-        console.error('お題生成エラー:', error);
-        // フォールバック
-        if (wordMode === 'safe') {
-            return {
-                village: "コーヒー",
-                wolf: "紅茶",
-                fox: "消防車"
-            };
-        } else {
-            return {
-                village: "コーヒー",
-                wolf: "紅茶",
-                fox: "バイブ"
-            };
-        }
+        console.error('お題生成エラー:', error.message || error);
+        // フォールバック（ランダムに選択）
+        const safeFallbacks = [
+            { village: "コーヒー", wolf: "紅茶", fox: "消防車" },
+            { village: "野球", wolf: "サッカー", fox: "たこ焼き" },
+            { village: "犬", wolf: "猫", fox: "新幹線" },
+            { village: "ピアノ", wolf: "ギター", fox: "カレーライス" },
+            { village: "東京タワー", wolf: "スカイツリー", fox: "すき焼き" },
+            { village: "将棋", wolf: "チェス", fox: "冷蔵庫" },
+            { village: "ラーメン", wolf: "うどん", fox: "パンダ" },
+            { village: "電車", wolf: "バス", fox: "ケーキ" },
+            { village: "鉛筆", wolf: "シャーペン", fox: "イルカ" },
+            { village: "クリスマス", wolf: "ハロウィン", fox: "掃除機" },
+        ];
+        const adultFallbacks = [
+            { village: "コーヒー", wolf: "紅茶", fox: "バイブ" },
+            { village: "バイブ", wolf: "ローター", fox: "原子力発電所" },
+            { village: "騎乗位", wolf: "バック", fox: "回転寿司" },
+            { village: "コスプレ", wolf: "メイド服", fox: "掃除機" },
+            { village: "手錠", wolf: "鞭", fox: "東京タワー" },
+        ];
+        const pool = wordMode === 'safe' ? safeFallbacks : adultFallbacks;
+        return pool[Math.floor(Math.random() * pool.length)];
     }
 }
 
@@ -260,7 +276,7 @@ fox: "ローター"（大人向け、全く違うジャンル）${historyList}
  * @returns {Promise<string[]>}
  */
 async function generateQuestions(topic) {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', safetySettings });
 
     const prompt = `ワードウルフゲームで「${topic}」というお題が出ています。
 このお題について他の参加者に質問する内容を5個、簡潔に提案してください。

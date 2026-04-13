@@ -250,7 +250,7 @@ function gameHandler(io) {
             room.gameState = 'playing';
 
             // タイマー設定（人数 × 秒/人）
-            const spp = secondsPerPlayer || 90; // デフォルト: 1分30秒/人
+            const spp = (secondsPerPlayer !== undefined && secondsPerPlayer !== null) ? secondsPerPlayer : 90;
             room.noTimeLimit = spp === 0;
 
             if (room.noTimeLimit) {
