@@ -53,7 +53,8 @@ const state = {
     wordMode: 'adult',
     players: [],
     topicRevealed: false,
-    isReconnecting: false
+    isReconnecting: false,
+    hasSubmittedAllAnswer: false
 };
 
 // DOM要素
@@ -839,6 +840,7 @@ socket.on('answererSelected', ({ answerer, isAllAnswerMode }) => {
 // 全員回答結果表示（モーダルで表示、閉じたら消える）
 socket.on('allAnswersRevealed', ({ answers }) => {
     hideLoading();
+    state.hasSubmittedAllAnswer = false;
     const list = document.getElementById('all-answers-result-list');
     list.innerHTML = answers.map((a, i) => `
         <div class="all-answer-result-item">
@@ -857,9 +859,11 @@ document.getElementById('close-all-answers-result').addEventListener('click', ()
     document.getElementById('all-answers-result-list').innerHTML = '';
 });
 
-// 回答進捗状況
+// 回答進捗状況（自分が回答済みの場合のみローディング表示）
 socket.on('answerSubmittedProgress', ({ answeredCount, totalCount }) => {
-    showLoading(`他のプレイヤーの回答を待っています... (${answeredCount}/${totalCount})`);
+    if (state.hasSubmittedAllAnswer) {
+        showLoading(`他のプレイヤーの回答を待っています... (${answeredCount}/${totalCount})`);
+    }
 });
 
 socket.on('checkUpdated', ({ playerId, type, checked }) => {
@@ -1063,6 +1067,7 @@ document.getElementById('submit-answer-btn').addEventListener('click', () => {
     const input = document.getElementById('all-answer-input');
     const answer = input.value.trim();
     if (answer) {
+        state.hasSubmittedAllAnswer = true;
         socket.emit('submitAllAnswer', { answer });
         document.getElementById('all-answer-modal').classList.add('hidden');
         input.value = '';
